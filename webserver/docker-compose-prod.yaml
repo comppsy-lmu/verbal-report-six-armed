@@ -4,7 +4,7 @@ services:
     build: .
 
     ports:
-      - "8000:8080"
+      - "8090:8080"
     volumes:
       # sync ressources folder
       - ../ressources:/usr/src/app/ressources

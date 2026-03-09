@@ -1,936 +1,1315 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Memory Experiment -2</title>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" rel="stylesheet" type="text/css" /> 
+
+<head>
+    <meta charset="UTF-8">
+
+    <!-- local jsPsych core -->
     <script src="jspsych/dist/jspsych.js"></script>
-    <script src="jspsych/dist/plugin-image-keyboard-response.js"></script>
-    <script src="jspsych/dist/plugin-same-different-html.js"></script>
-    <script src="jspsych/dist/plugin-html-slider-response.js"></script>
-    <script src="jspsych/dist/plugin-html-keyboard-response.js"></script>  
-    <script src="jspsych/dist/plugin-recording.js"></script> 
+    <link href="jspsych/dist/jspsych.css" rel="stylesheet" type="text/css" />
+
+    <!-- Initialize jsPsych -->
+    <script src="init-jspsych.js"></script>
+
+    <!-- jsPsych plugins (local) -->
+    <script src="jspsych/dist/plugin-html-keyboard-response.js"></script>
+    <script src="jspsych/dist/plugin-fullscreen.js"></script>
+    <script src="jspsych/dist/plugin-html-button-response.js"></script>
+    <script src="jspsych/dist/plugin-call-function.js"></script>
+    <script src="jspsych/dist/plugin-instructions.js"></script>
+    <script src="jspsych/dist/plugin-preload.js"></script>
+    <script src="jspsych/dist/plugin-recording.js"></script>
+
+    <!-- custom six-armed-bandit plugin -->
+    <script src="exp3_plugins.js"></script>
+
+    <!-- experiment runsheet -->
+    <script src="runsheet_exp3.js"></script>
+
+    <!-- stylesheets -->
+    <link href="style_rating.css" rel="stylesheet" />
+
 </head>
 
-<body></body>
+<body>
 <script>
 
+    var DEV_MODE = new URLSearchParams(window.location.search).has('dev');
+    var DEV_ROUNDS = 2;
 
-    /* initialize jsPsych */
-    var jsPsych = initJsPsych({
-      on_finish: function() {
-        /* jsPsych.data.displayData();
-        jsPsych.data.get().localSave('csv','TestData.csv'); */
-        sendData(jsPsych.data.allData.trials);
-      },
-      on_trial_start: function(trial) {
-        onTrialStartRecording(trial);
-        /* console.log(jsPsych.data)
-        console.log(trial) */
-        
-      },
-      on_trial_finish: function(trial) {
-        onTrialFinishRecording(trial);
-      }
+    var participant_id = jsPsych.randomization.randomID(10)
+
+    // capture info from Prolific
+    var subject_id = jsPsych.data.getURLVariable('PROLIFIC_PID');
+    var study_id = jsPsych.data.getURLVariable('STUDY_ID');
+    var session_id = jsPsych.data.getURLVariable('SESSION_ID');
+    // pick a random condition for the subject at the start of the experiment
+    //var condition_assignment = jsPsych.randomization.sampleWithoutReplacement(['flex', 'cons'], 1)[0];
+    var condition_assignment = "flex"
+
+    jsPsych.data.addProperties({
+        subject_id: subject_id,
+        study_id: study_id,
+        session_id: session_id,
+        condition: condition_assignment,
+        participant_id: participant_id
     });
 
-/* create timeline */
-    var timeline = [];
 
 
-var instruction_1 = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-size: 30px;font-family: Monospace'> Welcome!</div>"+
-      "<div style = 'font-size: 28px;font-family: Monospace'><br><br>This experiment will test your memory."+
-      "<br><br>You will complete 3 blocks of trials."+
-      "<br><br> Each block contains two phases: A <span style='color: red;'> STUDY phase </span> and a <span style='color: red;'> TEST phase </span>."+
-      "<br><br><br><br>Press the SPACE key to continue</div>",
-    choices: [" "],
-  };
+    // define welcome message
+    var welcome = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `Welcome to the experiment. Press any key to begin.`
+    };
 
-var instructions_1_2 = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-size:28px;font-family: Monospace'> In the STUDY phase, you will be shown a list of words."+
-      "<br><br><br> The words will appear one at a time at the centre of the screen." + 
-      "<br><br><br> Please remember them for the TEST phase.</span>"+
-      "<br><br><br><br> Press the SPACE key to continue</div>",
-      choices: [" "],
-  };
+    // define round end message
+    var round_end = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: "End of round. Take a break. Press any key to continue when you are ready.",
+        on_finish: function (data) {
+
+            counter.round += 1; // 24 rounds acquisition, 24 rounds transfer, 1 round expectation check (flex condition)
+            counter.trial = 1;
+            counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
+        }
+    };
 
 
-  var instruction_1_3 = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-size: 28px;font-family: Monospace; color:red'>" +
-    "<br><br> Throughout this experiment," + 
-    "<br><br> we will be recording your audio because we want " + 
-    "<br><br> to know how and why you are doing things.</div>" +
-    "<br><br><br><br><span style = 'font-size: 28px;font-family: Monospace; color:black'>Press the SPACE key continue</span></div>",
-    choices: [" "],
+    // define experiment end message
+    var expt_end = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: "You have reached the end of the experiment. Press any key to quit."
+    };
+
+    //------------------------------------
+    // Functions to turn fullscreen on/off
+    //------------------------------------
+
+    var fullscreen_on = {
+        type: jsPsychFullscreen,
+        fullscreen_mode: true,
+        message: '<p>The experiment will switch to full screen mode when you press the button below.</p><p>Where possible, please stay in full screen mode for the entire experiment.</p>'
+    };
+
+
+    var fullscreen_off = {
+        type: jsPsychFullscreen,
+        fullscreen_mode: false
+    };
+
+
+    //------------------------------------
+    // Define and randomise experimental variables
+    //------------------------------------
+
+    // set up block and trial counters
+    var counter = {};
+    counter.round = 0;
+    counter.trial = 1;
+    counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
+
+    var currentPhase = "";
+    var phaseRound = 0;
+
+
+    //------------------------------------
+    // Choice trials
+    //------------------------------------
+    let isPracticePhase = true; // set this to `false` when the task phase starts
+    let isAcquisition = false; // set this to "true" when acquisition phase starts, and again to "false" when transfer phase starts
+    let isFinalRound = false; // set this to "true" in the final round (no. 49)
+    let isSeqGen = false; // set this to "true" when sequence-generation task starts (after the choice task)
+
+    // track accuracy
+    var correct_option = null; // Store the correct choice per round
+
+    // section correct
+    var section_only = null;
+
+
+
+var pred_section_trial = { // prediction trials -> section has to be selected, not a specific option within a section
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `
+    <style>
+      .grid-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 30px;
+        justify-items: center;
+        bottom: 10%;
+        transform: translateX(-50%);
+        left: 50%;
+        position: absolute;
+      }
+      .section {
+        border: 2px solid #888;
+        border-radius: 12px;
+        padding: 25px;
+        text-align: center;
+        background-color: #eef1f5;
+        width: 400px;
+        height: 200px;
+        box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+        cursor: pointer; /* make it look clickable */
+        transition: background-color 0.2s;
+
+        font-size: 35px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .section:hover {
+        background-color: #d1eaff;
+      }
+      .section-instruction {
+        font-size: 28px;
+        font-weight: bold;
+        text-align: center;
+        width: 4000px;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 12%;
+
+    }
+      .add-info {
+        font-size: 24px;
+        text-align: center;
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 17%;
+    }
+    </style>
+    <p class="section-instruction">Which section will contain the winner in the following round?</p>
+    <p class="add-info">Please select one section:</p>
+    <div class="grid-container">
+      <div class="section" data-choice="Section 1">Section 1</div>
+      <div class="section" data-choice="Section 2">Section 2</div>
+      <div class="section" data-choice="Section 3">Section 3</div>
+      <div class="section" data-choice="Section 4">Section 4</div>
+      <div class="section" data-choice="Section 5">Section 5</div>
+      <div class="section" data-choice="Section 6">Section 6</div>
+    </div>
+  `,
+  choices: () => [],
+  on_load: () => {
+    const sections = document.querySelectorAll('.section');
+    sections.forEach(section => {
+      section.addEventListener('click', () => {
+        const choice = section.dataset.choice;
+        jsPsych.finishTrial({
+          choice: choice
+        });
+      });
+    });
+  },
+  on_start: function(data) {
+    data.choice_type = "prediction";
   }
-
-
-var instruction_1_4 = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-size: 24px;font-family: Monospace; color:red'>" +
-    "<br> Could you please talk us through how you are making your decisions." +
-    "<br><br><br> Simply speak out loud about your thought process during the experiment."+
-    "<br><br><br> Don't hesitate to share every detail - we are keen to understand all aspects" + 
-    "<br><br> of how you reach your decision."+
-    "<br><br><br> Don't worry about how you phrase your sentences or your speaking style."+
-    "<br><br><br> <strong>Just speak clearly and naturally.</strong></div>"+
-    "<br><br><br><br><span style = 'font-size: 28px;font-family: Monospace; color:black'>Press the SPACE key when you are ready to start the 1st block</span>",
-    choices: [" "],
-}
-  
-var instruction_BeforeTestPhase = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "<div style = 'font-size: 28px;font-family: Monospace'>  You have reached the  <span style='color: red;'> TEST phase. </span>"+
-            "<br><br><br> You will see two words and a response scale." +
-            "<br><br><br> Your task is to indicate which of the two words you remember" +
-            "<br><br><br> Use the response scale to indicate which word you remember, and how confident you are in your response."+
-            "<br><br><br> The slider will appear when you place your cursor over the scale."+
-            '<br><br><img src = "img/scale_img.png" style ="height:170px; width:800px;border: 1px solid;padding: 10px;box-shadow: 5px 10px #888888">'+
-            "<br><br><br>Press the SPACE key when you are ready to start the TEST phase",
-  choices: [" "],
-}
-
-
-var instruction_btw_lists_1_2 = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "<div style = 'font-size: 28px;font-family: Monospace'>End of Block 1.<br>" +
-  "<br><br>A quick reminder: You will be shown a list of words."+
-  "<br><br>The words will appear one at a time at the centre of the screen.</br><br>Please remember them for the TEST phase."+
-  "<br><br><br><span style='color: red;'>Remember that we are interested in your thought process during this experiment, <br><br>so please speak your thoughts out loud during this next phase of the experiment. <br><br>Don't worry about how you phrase things, just speak clearly and naturally.</span>"+
-  "<br><br><br><br>Press the SPACE key to continue with the 2nd block. </div>",
-  choices: [" "],
-}
-
-
-var instruction_btw_lists_2_3 = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "<div style = 'font-size: 28px;font-family: Monospace'>End of Block 2." +
-  "<br><br>A quick reminder: You will be shown a list of words.<br><br><br>The words will appear one at a time at the centre of the screen.</br><br>Please remember them for the TEST phase."+
-  "<br><br><br><span style='color: red;'>Remember that we are interested in your thought process during this experiment, <br><br>so please speak your thoughts out loud during this next phase of the experiment. <br><br>Don't worry about how you phrase things, just speak clearly and naturally.</span>"+
-  "<br><br><br><br>Press the SPACE key to continue with the 3rd block. </div>",
-  choices: [" "],
-}
-
-
-var instruction_end = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "<div style = 'font-size: 28px;font-family: Monospace'>End of the Experiment." +
-  "<br><br><br><br><span style='color: red;'>Here is your completion code: C178W5AP</span><br><br>Press the SPACE key to end the experiment and click 'ok' to send your data. <br><br>After copying this code, you can close the Website's tab.  </div>",
-  choices: [" "],
-}
-
-var instruction_3 = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "You have reached the test phase. <br>You will see two words and a response scale. </br>Your task is to indicate which of the two words you remember.<br>"+
-  "Use the response scale to indicate which word you remember, and how confident you are in your response.<br>"
-}
-
-// function that creates the list of stimuli (i.e., a <p> tag around each word) 
-function insertWordsToStructure(words) {
-    return words.map(word => ({
-        stimulus: `<p style="font-size: 60px;font-family: Monospace">${word}</p>`
-    }));
-}
-
-// List of unrelated words:
-var words_unrelated = ["ape", "bard", "bile", "blitz", "brink", "brook", "broth", "bruise", "bunt", "caste",
-                      "chalk", "cheat", "chess", "chick", "chop", "clam", "cloak", "clot", "clown", "cluck",
-                      "coop", "crook", "crumb", "darn", "dew", "doom", "drone", "dwarf", "elm", "farce",
-                      "feast", "fiend", "flare", "flaw", "float", "fuzz", "gasp", "geese", "gleam", "gloat",
-                      "goal", "gone", "grime", "grove", "halt", "haste", "haul", "heed", "heist", "hum",
-                      "jolt", "jute", "lamb", "lark", "leak", "leer", "loaf", "mace", "mash", "meal",
-                      "meat", "mime", "moat", "moot", "mute", "nark", "neap", "need", "pale", "peal",
-                      "peel", "pout", "prize", "prose", "prove", "punt", "roam", "rove", "shout", "shove",
-                      "slope", "sloth", "slot", "spat", "spew", "spout", "spume", "streak", "stroke", "swim",
-                      "tilt", "toot", "trope", "veal", "weal", "wilt", "woof", "wool", "yarn", "zoom",              
-                      "TOWN","CHILD","FEEL","LAND","GIRL","SIX","FRONT","VOICE","AGE",
-                      "WIFE","COST","COURT","FORCE","LOVE","TURN","CLOSE","WEST","JOB","BOARD","CHANGE","SOUTH","BOY",
-                      "STREET","AIR","MISS","KEEP","CAR","FIELD","WORD","HALF","WEEK","DEATH"];
-
-words_unrelated = words_unrelated.map(v => v.toLowerCase());
-
-
-
-// List of cities:
-var words_cities = ["sydney", "los angeles", "bucharest", "chicago", "auckland",
-                      "london", "tokyo", "delhi", "mumbai", "shanghai", "moscow", 
-                      "seoul", "new york", "hanoi", "bangkok", "berlin", "madrid", 
-                      "amsterdam", "athens", "baghdad", "beirut", "cairo", "budapest",
-                      "copenhagen", "dublin", "helsinki", "jakarta", "jerusalem",     
-                      "kiev", "lisbon", "manila", "oslo", "ottawa", "paris","prague", 
-                      "rome", "stockholm", "taipei", "jordan", "istanbul", "toronto",
-                      "munich", "kyoto", "seattle", "beijing", "barcelona", "brussels", "dubai"];
-
-// List of countries:
-var words_countries = ["canada", "france", "mexico", "england", "germany", 
-                      "spain", "italy", "china", "japan", "russia", 
-                      "brazil", "ireland", "australia", "iraq", "finland", 
-                      "argentina", "india", "switzerland", "sweden", "africa", 
-                      "chile", "britain", "iran", "portugal", "greece", 
-                      "scotland", "egypt", "israel", "peru", "belgium", 
-                      "korea", "norway", "denmark", "lebanon", "malaysia", 
-                      "poland", "taiwan", "romania", "serbia", "singapore", 
-                      "indonesia", "taiwan", "turkey", "vietnam", "thailand", 
-                      "philippines", "pakistan", "netherlands"];
-
-// List of body parts:
-var words_body = ["leg", "arm", "nail", "muscle", "feet", "finger", "head", 
-                  "toe", "eye", "hand", "nose", "ear", "mouth", "stomach", 
-                  "heart", "knee", "neck", "brain", "hair", "elbow", 
-                  "shoulder", "chest", "spine", "hip", "lip", "thigh", 
-                  "ankle", "face", "liver", "lung", "tongue", "teeth", 
-                  "torso", "wrist", "bone", "palm", "forearm", "eyebrow", 
-                  "throat", "earlobe", "jaw", "nostril", "forehead", 
-                  "knuckle", "heel", "skin", "cheeks", "eyelid"]
-
-
-// Create the list of stimuli
-var study_list_unrelated = insertWordsToStructure(words_unrelated);
-var study_list_cities = insertWordsToStructure(words_cities);
-var study_list_countries = insertWordsToStructure(words_countries);
-var study_list_body = insertWordsToStructure(words_body);
-
-
-////////////////////////////////
-/// Memory Task - Study Phase ///
-////////////////////////////////
-
-// create empty objects to hold the stimuli.
-cities_list_html = [];
-countires_list_html = [];
-body_list_html = [];
-unrelated_list_html = [];
-
-// loop to fill up the empty objects, each of the length 100 (at the end each participant learns about 32 words of each list)
-for (let i = 0; i < study_list_cities.length; i++) {
-  cities_list_html.push(
-    study_list_cities[i] // length 48
-  );
-}
-
-for (let i = 0; i < study_list_unrelated.length; i++) {
-  unrelated_list_html.push(
-    study_list_unrelated[i] // length 100
-  );
-}
-
-
-for (let i = 0; i < study_list_countries.length; i++) {
-  countires_list_html.push(
-    study_list_countries[i] // length 48
-  );
-}
-
-for (let i = 0; i < study_list_body.length; i++) {
-  body_list_html.push(
-    study_list_body[i] // length 48
-  );
-}
-
-
-// create a fixation cross
-var fixation = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: '<div style="font-size:60px;">+</div>',
-  choices: "NO_KEYS",
-  trial_duration: 1000,
 };
 
-// a function that randomaly smaples from the list. It takes an array of objects and the length of the sample as arguments. 
-function sampleRandomly20(arr, count) {
-    let result = [];
-    let tempArray = arr.slice(); // Create a copy of the original array
 
-    for (let i = 0; i < count; i++) {
-        if(tempArray.length === 0) break; // Break if there are no more elements to sample
-        const randomIndex = Math.floor(Math.random() * tempArray.length);
-        result.push(tempArray[randomIndex]);
-        tempArray.splice(randomIndex, 1); // Remove the selected element
+// label shuffling
+let currentShuffledLabels = [];
 
-        arr.splice(randomIndex, 1);
-    }
-
-    return result;
-}
-
-function sampleWithReplacement(arr, count) {
-  let result = [];
-  for (let i = 0; i < count; i++) {
-      if(arr.length === 0) break; // Break if there are no more elements to sample
-      const randomIndex = Math.floor(Math.random() * arr.length);
-      result.push(arr[randomIndex]);
+function shuffleArray(array) {
+  let newArr = array.slice();
+  for (let i = newArr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
   }
-
-  return result;
+  return newArr;
 }
 
+// ---- Start/Stop recording trial nodes ----
 
-// sample N from each list sampling without replacememnt 
-cities_20array = sampleRandomly20(study_list_cities, 16)  
-countries_20array = sampleRandomly20(study_list_countries, 16)  
-body_20array = sampleRandomly20(study_list_body, 16)  
-
-random_20array = sampleRandomly20(study_list_unrelated, 16*3)
-var random_left = [];
-var random_left = unrelated_list_html.filter(item => !random_20array.includes(item));
-
-
-let array_cities = Object.values(cities_20array);
-let array_countries = Object.values(countries_20array);
-let array_body = Object.values(body_20array);
-
-
-// add unrelated words to each of the test lists. For example, for the list of body parts of the length X,
-// a list of unrelated words of the same length will be added.
-var random_20array_tmp = random_20array.slice()
-var cities_list = array_cities.concat(sampleRandomly20(random_20array_tmp, 16));
-var countries_list = array_countries.concat(sampleRandomly20(random_20array_tmp, 16));
-var body_list = array_body.concat(sampleRandomly20(random_20array_tmp, 16));
-
-
-// create part of a trial, on which the stimulus is presented for the time duration of 2ms. 
-var test = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: jsPsych.timelineVariable('stimulus'),
-  trial_duration: 2500,
-  choices: "NO_KEYS"
+function makeStartRecording(phase) {
+    return {
+        type: jsPsychCallFunction,
+        async: true,
+        func: function(done) {
+            if (phase && currentPhase !== phase) { currentPhase = phase; phaseRound = 0; }
+            audioRecorder.start()
+                .then(function() { done(); })
+                .catch(function(error) { console.log("Recording start error:", error); done(); });
+        }
+    };
 }
 
+var stop_recording = {
+    type: jsPsychCallFunction,
+    async: true,
+    func: function(done) {
+        audioRecorder.stop()
+            .then(audioAsblob => {
+                blobToBase64(audioAsblob).then(res => {
+                    phaseRound++;
+                    sendAudio(res, currentPhase + "_" + phaseRound);
+                    done();
+                });
+            })
+            .catch(error => {
+                console.log("Recording stop error:", error);
+                done();
+            });
+    }
+};
 
-//////////////////////////////////////////
-//// A Distraction Task: N-Back Task /////
-/////////////////////////////////////////
 
-var instruction_nBack = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: "<div style = 'font-size: 30px;font-family: Monospace'>"+
-  "<br>Before the test phase begins, you will complete a short activity."+
-  "<br><br>You will be shown a sequence of numbers, presented one at a time."+
-  "<br><br><br>Your task is to determine whether each current stimulus matches the one presented 2 steps earlier in the sequence."+
-  "<div style ='display:inline-block;vertical-align:middle;'><br><br>For example, if you see the following numbers &#x2192; <img src = 'img/nBack_black.png'; style='height: 100px ; width: 280px;vertical-align:middle;'></div>"+
-  "<div style ='display:inline-block;vertical-align:middle;'><br><br><br>You should press the Enter key for the numbers 3 and 8 &#x2192; <img src = 'img/nBack_red.png'; style='height: 90px ;width: 280px;vertical-align:middle;padding-bottom:30px'></div>"+
-  "<br><br><br><br> Press the SPACE key to start the task"+
-  "</div>"
-}
+    // rounds
+    var round_flex = {
+        timeline_variables: task_stimuli_round,
+        sample: {
+            type: 'with-replacement',
+            size: 1
+        },
+        timeline:
+            [{
+                type: jsPsychSixArmedBandit,
+                n_trials: 6,
+                choice_type: jsPsych.timelineVariable('choice_type')
 
-// create an array of numbers 
-function generateNBackSequence(length, x) {
+            }],
+        conditional_function: function() {
+            const data = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' });
+            const lastTrial = data.last(1).values()[0];
 
-    let sequence = [];
-    for (let i = 0; i < length; i++) {
-        if ((i + 1) % x === 0 && i > 1) {
-            // Every x-th element should be the same as the second-to-last number
-            sequence.push(sequence[sequence.length - 2]);
+            console.log("Last Trial Data:", lastTrial);
+
+            if (!lastTrial) {
+            console.log("No previous trials. Starting first round.");
+            return true;
+            }
+
+            if (lastTrial.choice === lastTrial.correct_option && lastTrial.round === counter.round) {
+            console.log("Ending early due to correct response.");
+            return false;
+            }
+
+            console.log("Continuing to next round.");
+            return true;
+            }
+    };
+
+
+    var round_cons = {
+        timeline_variables: task_stimuli_round,
+        sample: {
+            type: 'with-replacement',
+            size: 1
+        },
+        timeline:
+            [{
+                type: jsPsychSixArmedBandit,
+                n_trials: 6,
+                choice_type: jsPsych.timelineVariable('choice_type')
+            }],
+        conditional_function: function() {
+            const data = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' });
+            const lastSixArmedTrial = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' }).last(1).values()[0];
+
+            console.log("Last Trial Data:", lastSixArmedTrial);
+
+            if (!lastSixArmedTrial) {
+            console.log("No previous trials. Starting first round.");
+            return true;
+            }
+
+            if (lastSixArmedTrial.choice === lastSixArmedTrial.correct_option && lastSixArmedTrial.round === counter.round) {
+            console.log("Ending early due to correct response.");
+            return false;
+            }
+
+            console.log("Continuing to next round.");
+            return true;
+            }
+
+    };
+
+
+    var fin_round = { // round 49 (identical for both conditions)
+        timeline_variables: task_stimuli_round,
+        sample: {
+            type: 'with-replacement',
+            size: 1
+        },
+        timeline:
+            [{
+                type: jsPsychSixArmedBandit,
+                n_trials: 6,
+                choice_type: jsPsych.timelineVariable('choice_type')
+            }],
+        conditional_function: function() {
+            const data = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' });
+            const lastTrial = data.last(1).values()[0];
+
+            console.log("Last Trial Data:", lastTrial);
+
+            if (!lastTrial || counter.trial == 0) {
+            console.log("No previous trials. Starting first round.");
+            return true;
+            }
+
+            if (lastTrial.choice === lastTrial.correct_option && counter.trial > 0) {
+            console.log("Ending early due to correct response.");
+            return false;
+            }
+
+            console.log("Continuing to next round.");
+            return true;
+            }
+    };
+
+
+    // if_nodes for early stopping if correct option is chosen
+    var if_node_cons = {
+        timeline: [round_cons],
+        repetitions: 6, // max. 6 trials
+        conditional_function: function () {
+            // execute timeline if condition_assignment = 'cons', skip if condition_assignment = 'flex'
+            if ((condition_assignment == 'flex' && isAcquisition == true) || (condition_assignment == 'cons' && isAcquisition == false)) {
+                return false;
+            } else if ((condition_assignment == 'cons' && isAcquisition == true) || (condition_assignment == 'flex' && isAcquisition == false)) {
+                return true;
+            }
+        }
+    };
+
+    var if_node_flex = {
+        timeline: [round_flex],
+        repetitions: 6, // max. 6 trials
+        conditional_function: function () {
+            // execute timeline if condition_assignment = 'flex' & isAcquisition = true, skip if condition_assignment = 'cons'
+            if ((condition_assignment == 'cons' && isAcquisition == true) || (condition_assignment == 'flex' && isAcquisition == false)) {
+                return false;
+            } else if ((condition_assignment == 'flex' && isAcquisition == true) || (condition_assignment == 'cons' && isAcquisition == false)) {
+                return true;
+            }
+        }
+    };
+
+    var if_node_final = {
+        timeline: [fin_round],
+        repetitions: 6 // max. 6 trials
+    };
+
+
+
+
+    // confidence rating
+    // function to update slider output and enable button
+    function updateSlider(value) {
+        document.getElementById(`output`).textContent = value + '%'; // Update label
+        sliderAdjusted = true; // Mark slider as adjusted
+
+        // Enable Confirm button if both sliders are adjusted
+        const confirmButton = document.getElementById('confirm-btn');
+        if (sliderAdjusted) {
+            confirmButton.disabled = false;
         } else {
-            // Generate a random number (e.g., between 0 and 9)
-            let randomNumber = Math.floor(Math.random() * 10);
-            sequence.push(randomNumber);
+            confirmButton.disabled = true;
         }
     }
-    return sequence;
-}
-
-// Example usage
-let sequence = generateNBackSequence(20, 2); // Generate a sequence of 20 numbers where every 4th number is the same as the second-to-last number
 
 
-var n = [
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[0] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[1] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[2] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[3] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[4] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[5] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[6] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[7] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[8] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[9] + "</p>"},
-  {n: "<p style=\"font-size:60px;font-family: Monospace\">" + sequence[10] + "</p>"}
-]
-
-// create the stimilus representation N-Back task, on which the participants has to 
-//press a key if the Nth number ago was identical to the currently presented one. Each number is presented for 1000ms. 
-var n_back = {
-  type: jsPsychHtmlKeyboardResponse,
-  stimulus: jsPsych.timelineVariable('n'),
-  trial_duration: 1000,
-  choices: ["k", "d"]
-}
-
-// Create a trial, on which numbers are presented sequentially separated by a fixation corss. 
-var n_back_procedure = {
-  timeline: [fixation, n_back],
-  timeline_variables: n,
-  randomize_order: false
-}
-
-// an introduction page for the N-back task 
-var n_back_intro = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-size: 30px;font-family: Monospace'>Press the space key to begin the next (n-back) task</div>",
-    choices: [" "]
-};
-
-
-
-////////////////////////////////
-/// Memory Task - Test Phase ///
-////////////////////////////////
-
-// sample of old words 
-var cityNew_unrelatedOld_pairs = [];
-var cityOld_unrelatedNew_pairs = [];
-var unrelatedOld_unrelatedNew_pairs = [];
-var relatedNew_relatedNew_pairs = [];
-var unrelatedNew_unrelatedNew_pairs = [];
-var countries_combinedTexts = [];
-var body_combinedTexts = [];
-
-
-// shuffeling function for the location of the stimuli on the scales
-function shuffleWords(word1, word2) {
-  return Math.random() > 0.5 ? [word1, word2] : [word2, word1];
-}
-
-
-var countries_first = []; 
-var countries_second= []; 
-var countries_pairs = [];
-
-var cities_first = []; 
-var cities_second= []; 
-var cities_pairs = [];
-
-var body_first = []; 
-var body_second= []; 
-var body_pairs = [];
-
-var remaining_cities = study_list_cities
-var taken_cities = cities_20array
-
-var remaining_countries = study_list_countries
-var taken_countries = countries_20array
-
-var remaining_body = study_list_body
-var taken_body = body_20array
-
-var remaining_unrelated = study_list_unrelated
-
-console.log(remaining_unrelated)
-var taken_unrelated = random_20array
-
-for (let g = 0; g < 8; g++) {
-  // R1 vs. R0
-  var cities_matched_old_1 = sampleRandomly20(taken_cities, 1)[0].stimulus.match(/>([^<]+)</);
-  var cities_old_1 = cities_matched_old_1 ? cities_matched_old_1[1] : '';
-  var cities_matched_new = sampleRandomly20(remaining_cities,1)[0].stimulus.match(/>([^<]+)</);
-  var cities_new_1 = cities_matched_new ? cities_matched_new[1] : '';
-  // R0 vs. U1
-  var cities_matched_new_2 = sampleRandomly20(remaining_cities,1)[0].stimulus.match(/>([^<]+)</);
-  var cities_new_2 = cities_matched_new_2 ? cities_matched_new_2[1] : '';
-  var random_matched_old = sampleRandomly20(taken_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var random_old_1 = random_matched_old ? random_matched_old[1] : ''; 
-  // R1 vs. U0
-  var cities_matched_old_2 = sampleRandomly20(taken_cities, 1)[0].stimulus.match(/>([^<]+)</);
-  var cities_old_2 = cities_matched_old_2 ? cities_matched_old_2[1] : '';
-  var random_matched_new_1 = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_1 = random_matched_new_1 ? random_matched_new_1[1] : ''; 
-  // U1 vs. U0
-  var random_matched_old_2 = sampleRandomly20(taken_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_old_2 = random_matched_old_2 ? random_matched_old_2[1] : '';
-  var random_matched_new_2 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_2 = random_matched_new_2 ? random_matched_new_2[1] : ''; 
-
-  cities_first.push({R1: cities_old_1}, {R0: cities_new_2}, {R1: cities_old_2}, {U1: random_old_2})
-  cities_second.push({R0: cities_new_1}, {U1: random_old_1}, {U0: random_new_1}, {U0: random_new_2})
-
-  ////////////////////////////////////////////////////////////////////////////////////////////
-
-  //// Countries VS. Unrelated
-
-  // R1 vs. R0
-  var countries_matched_old = sampleRandomly20(taken_countries,1)[0].stimulus.match(/>([^<]+)</);
-  var countries_old = countries_matched_old ? countries_matched_old[1] : '';
-  var countries_matched_new_1 = sampleRandomly20(remaining_countries,1)[0].stimulus.match(/>([^<]+)</);
-  var countries_new_1 = countries_matched_new_1 ? countries_matched_new_1[1] : '';
-  // R0 vs. U1
-  var countries_matched_new_2 = sampleRandomly20(remaining_countries,1)[0].stimulus.match(/>([^<]+)</);
-  var countries_new_2 = countries_matched_new_2 ? countries_matched_new_2[1] : '';
-  var random_matched_old_1 = sampleRandomly20(taken_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_old_1 = random_matched_old_1 ? random_matched_old_1[1] : ''; 
-  // R1 vs. U0
-  var countries_matched_old_2 = sampleRandomly20(taken_countries,1)[0].stimulus.match(/>([^<]+)</);
-  var countries_old_2 = countries_matched_old_2 ? countries_matched_old_2[1] : '';
-  var random_matched_new_1 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_1 = random_matched_new_1 ? random_matched_new_1[1] : ''; 
-  // U1 vs. U0
-  var random_matched_old = sampleRandomly20(taken_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_old_2 = random_matched_old ? random_matched_old[1] : '';
-  var random_matched_new_2 = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_2 = random_matched_new_2 ? random_matched_new_2[1] : ''; 
-
-
-  countries_first.push({R1: countries_old}, {R0: countries_new_2}, {R1: countries_old_2}, {U1: random_old_2})
-  countries_second.push({R0: countries_new_1}, {U1: random_old_1}, {U0: random_new_1}, {U0: random_new_2})
-
-
-  ////////////////////////////////////////////////////////////////////////////////////////////
-
-  //// Body VS. Unrelated
-
-  // R1 vs. R0
-  var body_matched_old = sampleRandomly20(taken_body,1)[0].stimulus.match(/>([^<]+)</);
-  var body_old = body_matched_old ? body_matched_old[1] : '';
-  var body_matched_new = sampleRandomly20(remaining_body, 1)[0].stimulus.match(/>([^<]+)</);
-  var body_new_1 = body_matched_new ? body_matched_new[1] : '';
-  // R0 vs. U1
-  var body_matched_new_2 = sampleRandomly20(remaining_body, 1)[0].stimulus.match(/>([^<]+)</);
-  var body_new_2 = body_matched_new_2 ? body_matched_new_2[1] : '';
-  var random_matched_old = sampleRandomly20(taken_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_old = random_matched_old ? random_matched_old[1] : ''; 
-  // R1 vs. U0
-  var body_matched_old_2 = sampleRandomly20(taken_body,1)[0].stimulus.match(/>([^<]+)</);
-  var body_old_2 = body_matched_old_2 ? body_matched_old_2[1] : '';
-  var random_matched_new_1 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_1 = random_matched_new_1 ? random_matched_new_1[1] : ''; 
-  // U1 vs. U0
-  var random_matched_old_2 = sampleRandomly20(taken_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_old_2 = random_matched_old_2 ? random_matched_old_2[1] : '';
-  var random_matched_new_2 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var random_new_2 = random_matched_new_2 ? random_matched_new_2[1] : ''; 
-
-  body_first.push({R1: body_old}, {R0: body_new_2}, {R1: body_old_2}, {U1: random_old_2})
-  body_second.push({R0: body_new_1}, {U1: random_old}, {U0: random_new_1}, {U0: random_new_2})
-
-}
-
-
-
-pairs_cities_raw = []
-for (let h = 0; h <32; h++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(cities_first[h])[0], Object.values(cities_second[h])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px">
-                  <p>Use the response scale to indicate which word you remember, and how confident you are in your response.</p>
-                  <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                      <p>${displayedFirstWord}</p>
-                  </div>
-                  <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                      <p>${displayedSecondWord}</p>
-                  </div>
-                  </div>`;
-
-  cities_pairs.push({
-      slider: htmlString
-  });
-
-  pairs_cities_raw.push({
-      pair: [cities_first[h], cities_second[h]]
-  })
-}
-
-pairs_body_raw = [];
-for (let k = 0; k <32; k ++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(body_first[k])[0], Object.values(body_second[k])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px">
-                  <p>Use the response scale to indicate which word you remember, and how confident you are in your response.</p>
-                  <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                      <p>${displayedFirstWord}</p>
-                  </div>
-                  <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                      <p>${displayedSecondWord}</p>
-                  </div>
-                  </div>`;
-
-  body_pairs.push({
-      slider: htmlString
-  });
-  pairs_body_raw.push({
-      pair: [body_first[k], body_second[k]]
-  });
-}
-
-
-
-var pairs_countries_raw = [];
-
-for (let j = 0; j <32; j ++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(countries_first[j])[0], Object.values(countries_second[j])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px">
-                    <p>Use the response scale to indicate which word you remember, and how confident you are in your response.</p>
-                    <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                        <p>${displayedFirstWord}</p>
+    var confidence = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: function() {
+            const lastChoice = jsPsych.data.get().last(1).values()[0].choice;
+            return `
+                <style>
+                    .confidence-container {
+                        width: 900px;
+                        margin: 100px auto;
+                        text-align: center;
+                    }
+                    .slider-track {
+                        width: 100%;
+                        height: 60px;
+                        background: linear-gradient(to right, #ff4444, #ffaa00, #44ff44);
+                        border-radius: 10px;
+                        position: relative;
+                        cursor: pointer;
+                        margin: 40px 0;
+                    }
+                    .slider-labels {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 22px;
+                        margin-bottom: 10px;
+                    }
+                    .confidence-value {
+                        font-size: 36px;
+                        font-weight: bold;
+                        margin-top: 20px;
+                        min-height: 40px;
+                    }
+                    .choice-display {
+                        font-size: 28px;
+                        margin-bottom: 40px;
+                    }
+                    .instruction-text {
+                        font-size: 20px;
+                        color: #666;
+                        margin-top: 10px;
+                    }
+                </style>
+                <div class="confidence-container">
+                    <div class="choice-display">Your prediction: <strong>${lastChoice}</strong></div>
+                    <p style="font-size: 24px; margin-bottom: 30px;">How confident are you in your prediction?</p>
+                    <div class="slider-labels">
+                        <span>Not confident at all</span>
+                        <span>Very confident</span>
                     </div>
-                    <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                        <p>${displayedSecondWord}</p>
+                    <div class="slider-track" id="slider-track"></div>
+                    <div class="confidence-value" id="confidence-value">--</div>
+                    <div class="instruction-text">Move mouse over the bar and click to confirm</div>
+                </div>
+            `;
+        },
+        choices: [],
+        trial_duration: null,
+        data: {
+            task: 'Estimate',
+        },
+        on_load: function() {
+            const track = document.getElementById('slider-track');
+            const valueDisplay = document.getElementById('confidence-value');
+            let hasClicked = false;
+
+            track.addEventListener('mousemove', function(e) {
+                if (!hasClicked) {
+                    const rect = track.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percentage = Math.round((x / rect.width) * 100);
+                    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+                    valueDisplay.textContent = clampedPercentage + '%';
+                }
+            });
+
+            track.addEventListener('click', function(e) {
+                if (!hasClicked) {
+                    hasClicked = true;
+                    const rect = track.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percentage = Math.round((x / rect.width) * 100);
+                    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+
+                    jsPsych.finishTrial({
+                        confidence: clampedPercentage
+                    });
+                }
+            });
+        }
+    }
+
+
+
+
+    var start_round = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function () {
+            return `<p style="font-size: 40px;">Round ${counter.round}</p>`;
+        },
+        choices: "NO_KEYS",
+        trial_duration: 1000,
+        on_start: function (data) {
+            console.log("Round:", counter.round)
+        },
+        on_finish: function (data) {
+            counter.trial = 0;  // reset trial counter
+        }
+    };
+
+
+    var feedback = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: function () {
+            const performance = jsPsych.data.get().last(1).values()[0];
+            if (performance.feedback === "CORRECT") {
+                label = "You WON!";
+                add_label = "";
+                color = "green";
+            } else {
+                label = "You LOST.";
+                add_label = "The winner was in: " + section_only; // remove letter
+                color = "red";
+            }
+
+            return `
+            <div style="font-size: 40px; font-weight: bold; text-align: center; margin-bottom: 20px; color: ${color};">
+              ${label}
+            </div>
+            <div style="font-size: 32px; text-align: center; margin-bottom: 20px; color: ${color};">
+              ${add_label}
+            </div>
+        `;
+        },
+        choices: ['Continue'],
+        button_html: `<button style="width: 150px; height: 50px; font-size: 18px; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); cursor: pointer; background-color: white; border: 1px solid black; border-radius: 5px;">
+            Continue
+        </button>`
+    };
+
+
+    var choice_task = {
+        timeline: [makeStartRecording("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, stop_recording, round_end],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 24,
+        randomize_order: false,
+        on_timeline_start: function () {
+            isPracticePhase = false;
+            isAcquisition = true;
+            isSeqGen = false;
+            isFinalRound = false;
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        }
+    };
+
+
+    var transfer = {
+        timeline: [makeStartRecording("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, stop_recording, round_end],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 24,
+        randomize_order: false,
+        on_timeline_start: function () {
+            isPracticePhase = false;
+            isAcquisition = false;
+            isSeqGen = false;
+            isFinalRound = false;
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        }
+
+    };
+
+
+    var expect_check = { // Section 1-C winner (same for both conditions)
+        timeline: [makeStartRecording("expectcheck"), pred_section_trial, confidence, start_round, if_node_final, feedback, stop_recording, round_end],
+        repetitions: 1,
+        randomize_order: false,
+        on_timeline_start: function () {
+            isFinalRound = true;
+            isPracticePhase = false;
+            isAcquisition = false;
+            isSeqGen = false;
+            counter.round = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        },
+        on_timeline_finish: function () {
+            sendData(jsPsych.data.get().csv());
+        },
+
+    };
+
+
+
+    //------------------------------------
+    // Instructions for the choice trials
+    //------------------------------------
+
+    var start_exp = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+            <p style="font-size: 20px;"><strong>You're ready to start the experiment now.</strong></p>
+            <p>Remember, the goal of the experiment is to <strong>find the winner!</strong></p>
+            <br></br>
+            <p>Press any key to begin.</p>
+            `,
+        on_finish: function (data) {
+            counter.trial = 1;  // reset trial counter
+        }
+    };
+
+
+    var instructions = {
+        type: jsPsychInstructions,
+        pages: [
+            `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1150px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>Choice Task</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>In the present experiment, you will make a series of decisions between <strong>several choice alternatives</strong> that are organized into <strong>six sections</strong> (see below). Every section contains the same six choice options (A, B, C, D, E, and F). You can click on <strong>one</strong> option in each trial.</p>
+            <p>After your choice, you will receive feedback whether you chose the <strong>winning option</strong>. If so, the word 'CORRECT' will be displayed on the bottom of the screen. If not, the word 'INCORRECT' will appear. There is only <strong>one</strong> winning option in each round.</p>
+            <p>You will play 49 rounds of this game. Each round comprises only <strong>six trials</strong>. Your goal is to <strong>find the winning option</strong> before the round ends, that is, you have <strong>six attempts</strong> (choices) in every round. The winning option changes between rounds.</p>
+          </div>
+
+          <!-- Image -->
+          <div style="position: relative; display: flex; justify-content: center; align-items: center; width: 80%; padding: 10px;">
+            <!-- Image -->
+            <img src="exampleTrialRound.png" alt="Choice Trial Example" width="900" style="display: block;">
+          </div>
+          <!-- Note -->
+            <div style="position: absolute; top: 60%; left: 12%; transform: translate(-50%, -50%); width: 150px; background-color: #f9f9f9; border: 1px solid #ccc; border-radius: 8px; padding: 10px; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);">
+              <p style="margin: 0; font-size: 16px; color: #333;"><strong>Note:</strong> Option F in Section 2 was chosen. This option was not the winner ('INCORRECT').</p>
+              <!-- Arrow -->
+              <div style="position: absolute; top: 50%; right: -10px; transform: translateY(-50%); width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-left: 10px solid #ccc;"></div>
+              <div style="position: absolute; top: 50%; right: -9px; transform: translateY(-50%); width: 0; height: 0; border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-left: 9px solid #f9f9f9;"></div>
+            </div>
+      </div>
+    `,
+            `
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1000px; margin: auto;">
+      <div style="text-align: center; width: 100%; font-size: 20px;">
+          <p><strong>Choice Task</strong></p>
+      </div>
+      <div style="text-align: left; width: 100%;">
+        <p>Each round <strong>ends after six trials or earlier</strong> if you manage to find the winning option sooner. For example, if you find the winning option in trial 3, the current round ends after this trial already.</p>
+        <p>At the end of each round, you will receive feedback on your performance. You <strong>either WON or LOST</strong>, depending on whether you found the winning option or not.</p>
+        <p>In case you could not find the winner, it will be revealed to you in which section the winner was at the end of each round.</p>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center;">
+        <img src="exampleFeedback_pos.png" alt="Positive Feedback" height="200" width ="400" style="display: block;">
+        <p><strong>OR</strong></p>
+        <img src="exampleFeedback_negative2.png" alt="Negative Feedback" height="200" width ="550" style="display: block; margin-left: 20px;">
+
+      </div>
+      <br></br>
+    </div>
+      `,
+            `
+    <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1150px; margin: auto;">
+      <div style="text-align: center; width: 100%; font-size: 20px;">
+          <p><strong>Prediction</strong></p>
+      </div>
+      <div style="text-align: left; width: 100%;">
+        <p>Before each round begins, we ask you to <em>predict</em> which <strong>section</strong> will contain the winning option in the following round (see image on the left-hand side). You can choose one section by clicking on one of the six boxes. After your prediction, you will be asked to indicate how confident you are in your prediction (see image on the right-hand side). To give your answer, move the mouse over the bar and click to confirm.</p>
+        <p>You will not receive immediate feedback whether your prediction is correct. You will find out during the following choice trials or when you receive feedback at the end of the round.</p>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center;">
+        <img src="examplePrediction.png" alt="Prediction Example" width="650" style="display: block;">
+        <img src="confidence.png" alt="Confidence Example" width="500" style="display: block; margin-left: 20px;">
+      </div>
+      <div style="text-align: left; width: 100%;">
+        <p>Each of the <strong>49 rounds</strong> consists of <strong>one prediction</strong> and <strong>max. 6 choice trials</strong>. The experiment will take approximately 25 minutes, and there is <strong>no</strong> time limit on your decisions.</p>
+        <p>Before starting the main task, you will first complete one <strong>practice round</strong> to familiarize yourself with the task. In this practice round, the winning option is in Section 1. Use this information to win! In the main task, you will not be given this information in advance. Once you're ready, click 'Next'.</p>
+      </div>
+    `
+        ],
+        show_clickable_nav: true,  // Enables navigation buttons
+        button_label_next: "Next",
+        button_label_previous: "Back"  // Enables the "Back" button
+
+    };
+
+    //-----------------------------------------------
+    // Practice trials - Prediction + choice task
+    //-----------------------------------------------
+
+    var round_practice = {
+        timeline_variables: task_stimuli_round,
+        sample: {
+            type: 'with-replacement',
+            size: 1
+        },
+        timeline:
+            [{
+                type: jsPsychSixArmedBandit,
+                n_trials: 6,
+                choice_type: jsPsych.timelineVariable('choice_type')
+
+            }],
+        conditional_function: function() {
+            const data = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' });
+            const lastTrial = data.last(1).values()[0];
+
+            console.log("Last Trial Data:", lastTrial);
+
+            if (!lastTrial) {
+            console.log("No previous trials. Starting first round.");
+            return true;
+            }
+
+            if (lastTrial.choice === lastTrial.correct_option) {
+            console.log("Ending early due to correct response.");
+            return false;
+            }
+
+            console.log("Continuing to next round.");
+            return true;
+        }
+    };
+
+
+    var if_node_practice = {
+        timeline: [round_practice],
+        repetitions: 6 // max. 6 trials
+    };
+
+
+    var start_round_practice = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+    <p style="font-size: 40px;">Practice Round</p>
+    `,
+        choices: "NO_KEYS",
+        trial_duration: 1000,
+        on_start: function() {
+            counter.trial = 0;
+        }
+    };
+
+    var practice = {
+        timeline: [pred_section_trial, confidence, start_round_practice, if_node_practice, feedback],
+        repetitions: 1,
+        randomize_order: false,
+        on_timeline_start: function() {
+            correct_option = "Section 1-C"
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        },
+        on_timeline_finish: function() {
+            counter.round = 1;
+        }
+    };
+
+
+
+
+    //------------------------------------
+    // Declaration of consent
+    //------------------------------------
+
+    // add sequence-generation task: "At the end of the experiment, we will ask you to complete another short variant of the same task, which serves to test what you have learned throughout the experiment."
+
+    var consent = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1100px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>General Information and Declaration of Consent</strong></p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p>Thank you for your interest in our research project. Enclosed you will find information about the research project, the conditions of participation and the handling of the collected data. Please read everything carefully. If you agree and want to participate in the experiment, please confirm by giving your consent below.</p>
+            </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>General information about the research project:</strong></p>
+            <p>This study investigates how people learn and make decisions in uncertain environments. The study takes about 25 minutes in total. It includes multiple rounds of a <strong><em>choice task</em></strong> in which you are presented with several choice options and your goal is to find the winning option among them before the round ends. Before each round, you will be asked to predict where the winning option can be found. At the end of the experiment, we will ask you to complete another <em><strong>short variant of the same task</em></strong>, which serves to test what you have learned throughout the experiment. No special stress or harm is expected as a result of participating in this research project. Participation in the study is remunerated at <strong>10\u20AC per hour</strong>, rounded up to the nearest minute. Even if you decide to withdraw from the study, you are still entitled to receive the corresponding remuneration for the time spent up to that point, provided that this can be clearly demonstrated (see section Voluntary participation).</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Voluntary participation:</strong></p>
+            <p>Your participation in this research project is <strong>voluntary</strong>. You can withdraw your consent to participate at any time and without giving reasons, without receiving any disadvantages. Even if you decide to withdraw from the study, you are still entitled to receive the corresponding remuneration for the time spent up to that point, provided that this can be clearly demonstrated.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Participation requirements:</strong></p>
+            <p>The participation requirements are <strong>a minimum age of 18 years, the absence of color blindness, and the absence of photosensitive epilepsy</strong> due to the potential for occasional unintended flickering of stimuli on the screen, which may occur in some web browsers. Those who have already participated in this study are excluded from participation.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Data protection and anonymity:</strong></p>
+            <p><strong>No personal data are collected</strong> as part of this study. It is therefore not possible for us to personally identify you. As a user of Prolific, you have entered into a separate personal data processing agreement with Prolific (https://participant-help.prolific.co/hc/en-gb/articles/360021786554-Data-Protection-and-Privacy-GDPR). This agreement is independent of your consent related to this study and the personal data collected by Prolific will not be made available to the research team of this study at any point.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Use of data:</strong></p>
+            <p>The results of this study may be published for teaching and research purposes (e.g. theses, scientific publications or conference papers). These results will be presented in anonymized form, i.e. without the data being able to be connected to a specific person. The fully anonymized data of this study will be made available as "open data" in an internet-based repository, if applicable. Thus, this study follows the recommendations of the German Research Foundation (DFG) for quality assurance with regard to verifiability and reproducibility of scientific results, as well as optimal data re-use. If you would like to receive information on the scientific results of the study after its completion, please send an e-mail to Henrike Flimm (Henrike.Flimm@psy.lmu.de).</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Legal basis and revocation:</strong></p>
+            <p>The legal basis for processing the aforementioned personal data is the consent pursuant to Art. 6 (1) letter a EU-DSGVO at the end of this document. You have the right to revoke the data protection consent at any time. The revocation does not affect the lawfulness of the processing carried out on the basis of the consent until the revocation. You can request an obligatory deletion of your data at any time - as long as you can provide sufficient information that allows us to identify your data. To do so, please contact the research project managers. You will not suffer any disadvantages as a result of the revocation.</p>
+          </div>
+          <div style="text-align: left; width: 100%;">
+            <p><strong>Research project managers:</strong></p>
+            <p>If you have any questions about the research project or if you want to exercise your right to withdraw your consent, please contact the research project managers:</p>
+            <p>Henrike Flimm: <a href="mailto:Henrike.Flimm@psy.lmu.de">Henrike.Flimm@psy.lmu.de</a><br>
+            Prof. Dr. Christopher Donkin: <a href="mailto:c.donkin@psy.lmu.de">c.donkin@psy.lmu.de</a></p>
+            <p>Ludwig-Maximilians-Universit\u00E4t M\u00FCnchen<br>
+            Department Psychologie<br>
+            Lehrstuhl f\u00FCr Computational Modeling in Psychology<br>
+            Akademiestr. 7<br>
+            80799 M\u00FCnchen</p>
+          </div>
+          <div style="text-align: left;">
+            <p><strong>Further contact addresses:</strong></p>
+            <p>You can also contact the data protection officer of the research institution or the competent supervisory authority if you have any data protection concerns in connection with this study and/or wish to lodge a complaint.</p>
+            <p>Ludwig-Maximilians-Universit\u00E4t M\u00FCnchen<br>
+            Beh\u00F6rdlicher Datenschutzbeauftragter<br>
+            Geschwister-Scholl-Platz 1<br>
+            D-80539 M\u00FCnchen<br>
+            Bayerisches Landesamt f\u00FCr Datenschutzaufsicht<br>
+            Promenade 27<br>
+            91522 Ansbach</p>
+            <br>
+            <p>Date: June 5, 2025</p>
+            <p><strong>Declaration of consent.</strong> I hereby certify that I have read and understood the participant information described above and that I agree to the conditions stated. I agree in accordance with Art. 6 (1) letter a EU-DSGVO. I have been informed about my right to revoke my data protection consent.</p>
+            <p><strong>Declaration of fulfillment inclusion criteria.</strong> I hereby confirm that I meet the above conditions for participation (18+ years old, absence of color blindness, absence of photosensitive epilepsy, first-time participation).</p>
+          </div>
+      </div>
+      <style>
+        .jspsych-content {
+          padding-bottom: 100px; /* Adds space between the buttons and the bottom of the screen */
+        }
+        .jspsych-html-button-response-button {
+          margin-top: 70px; /* Adds space between the text and the buttons */
+        }
+      </style>
+    `,
+        choices: ["I consent.", "I do not consent."], // redirection if data.response == 1 !
+        button_html: '<button style="font-size: 17px; height: 50px;">%choice%</button>',
+        on_finish: function (data) {
+            // execute timeline if response == 0 ("I consent."), skip if response == 1 ("I do not consent.")
+            if (data.response == 1) {
+                jsPsych.endExperiment('<p style="width: 800px;">As you have indicated that you do <u>not</u> consent to participate in this study, please return this submission on Prolific by selecting the "<u>stop without completing</u>" button.</p><p>Thank you for your time.</p>');
+            }
+        }
+
+    };
+
+
+    //------------------------------------
+    // Sequence-generation task
+    //------------------------------------
+
+
+    // Confidence rating for sequence generation task
+    var seq_confidence = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: function() {
+            const lastChoice = jsPsych.data.get().last(1).values()[0].choice;
+            return `
+                <style>
+                    .confidence-container {
+                        width: 900px;
+                        margin: 100px auto;
+                        text-align: center;
+                    }
+                    .slider-track {
+                        width: 100%;
+                        height: 60px;
+                        background: linear-gradient(to right, #ff4444, #ffaa00, #44ff44);
+                        border-radius: 10px;
+                        position: relative;
+                        cursor: pointer;
+                        margin: 40px 0;
+                    }
+                    .slider-labels {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 22px;
+                        margin-bottom: 10px;
+                    }
+                    .confidence-value {
+                        font-size: 36px;
+                        font-weight: bold;
+                        margin-top: 20px;
+                        min-height: 40px;
+                    }
+                    .choice-display {
+                        font-size: 28px;
+                        margin-bottom: 40px;
+                    }
+                    .instruction-text {
+                        font-size: 20px;
+                        color: #666;
+                        margin-top: 10px;
+                    }
+                </style>
+                <div class="confidence-container">
+                    <div class="choice-display">Your choice: <strong>${lastChoice}</strong></div>
+                    <p style="font-size: 24px; margin-bottom: 30px;">How confident are you in this choice?</p>
+                    <div class="slider-labels">
+                        <span>Not confident at all</span>
+                        <span>Very confident</span>
                     </div>
-                    </div>`;
-
-  countries_pairs.push({
-      slider: htmlString
-  });
-
-  pairs_countries_raw.push({
-      pair: [countries_first[j], countries_second[j]]
-  });
-}
-
-u0_u0_cities_1 = [];
-u0_u0_cities_2 = [];
-
-u0_u0_countries_1 = [];
-u0_u0_countries_2 = [];
-
-r0_r0_cities = [];
-r0_r0_countries = [];
-r0_r0_body = [];
-
-// 4 trials U0 U0; R0 R0; U0 R0. - cities
-//outerLoop:
-for (let m = 0; m < 4; m++) {
-  // R0 vs. R0 - cities
-  var related_new_cities_1 = sampleRandomly20(remaining_cities,1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cities_1 = related_new_cities_1 ? related_new_cities_1[1] : '';
-
-  var related_new_cities_2 = sampleRandomly20(remaining_cities,1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cities_2 = related_new_cities_2 ? related_new_cities_2[1] : '';
-
-  // U0 vs U0 - cities
-  var unrelated_new = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_1 = unrelated_new ? unrelated_new[1] : ''; 
-
-  var unrelated_new_2 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_2 = unrelated_new_2 ? unrelated_new_2[1] : ''; 
-
-
-  // U0 vs. R0 - cities
-  var unrelated_new_3 = sampleRandomly20(remaining_unrelated,1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_3 = unrelated_new_3 ? unrelated_new_3[1] : ''; 
-
-  var related_new_cities_3 = sampleRandomly20(remaining_cities,1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cities_3 = related_new_cities_3 ? related_new_cities_3[1] : '';
-
-  u0_u0_cities_1.push({R0: related_new_cities_1}, {U0: unrelated_new_1}, {U0: unrelated_new_3})
-  u0_u0_cities_2.push({R0: related_new_cities_2}, {U0: unrelated_new_2}, {R0: related_new_cities_3})
-
-}
-
-u0_u0_cities_1 = u0_u0_cities_1.filter(item => item !== undefined);
-u0_u0_cities_1 = u0_u0_cities_1.slice(0,12)
-
-u0_u0_cities_2 = u0_u0_cities_2.filter(item => item !== undefined);
-u0_u0_cities_2 = u0_u0_cities_2.slice(0,12)
-
-var matched_pairs_cities_raw = [];
-var matched_pairs_cities = [];
-for (let f = 0; f <12; f++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(u0_u0_cities_1[f])[0], Object.values(u0_u0_cities_2[f])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px">
-                <p>Use the response scale to indicate which word you remember, and how confident you are in your response.</p>
-                <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                    <p>${displayedFirstWord}</p>
+                    <div class="slider-track" id="slider-track"></div>
+                    <div class="confidence-value" id="confidence-value">--</div>
+                    <div class="instruction-text">Move mouse over the bar and click to confirm</div>
                 </div>
-                <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                    <p>${displayedSecondWord}</p>
-                </div>
-                </div>`;
+            `;
+        },
+        choices: [],
+        trial_duration: null,
+        on_load: function() {
+            const track = document.getElementById('slider-track');
+            const valueDisplay = document.getElementById('confidence-value');
+            let hasClicked = false;
 
-  matched_pairs_cities.push({
-      slider: htmlString
-  });
+            track.addEventListener('mousemove', function(e) {
+                if (!hasClicked) {
+                    const rect = track.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percentage = Math.round((x / rect.width) * 100);
+                    const clampedPercentage = Math.max(0, Math.min(100, percentage));
+                    valueDisplay.textContent = clampedPercentage + '%';
+                }
+            });
 
-  matched_pairs_cities_raw.push({
-      pair: [u0_u0_cities_1[f], u0_u0_cities_2[f]]
-  });
-}
+            track.addEventListener('click', function(e) {
+                if (!hasClicked) {
+                    hasClicked = true;
+                    const rect = track.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percentage = Math.round((x / rect.width) * 100);
+                    const clampedPercentage = Math.max(0, Math.min(100, percentage));
 
+                    jsPsych.finishTrial({
+                        confidence: clampedPercentage
+                    });
+                }
+            });
+        }
+    };
 
-// 4 trials U0 U0; R0 R0; U0 R0. - body 
-u0_u0_bdy_1 = [];
-u0_u0_bdy_2 = [];
+    var seq = { // selection of choices (not just sections)
+        timeline_variables: task_stimuli_round,
+        sample: {
+            type: 'with-replacement',
+            size: DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49
+        },
+        timeline:
+            [makeStartRecording("seqgen"),
+            {
+                type: jsPsychSixArmedBandit,
+                n_trials: DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49,
+                choice_type: jsPsych.timelineVariable('choice_type')
 
-for (let m = 0; m < 4; m++) {
-  // R0 vs. R0 - body  
-  var related_new_body_1 = sampleRandomly20(remaining_body, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_body_1 = related_new_body_1 ? related_new_body_1[1] : ''; 
+            },
+            seq_confidence,
+            stop_recording],
+        on_start: function() {
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+        },
+    };
 
-  var related_new_body_2 = sampleRandomly20(remaining_body, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_body_2 = related_new_body_2 ? related_new_body_2[1] : ''; 
+    var seq_end = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: "End of task. Press any key to quit."
+    };
 
-  // U0 vs U0 - body
-  var unrelated_new_bdy = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_bdy = unrelated_new_bdy ? unrelated_new_bdy[1] : ''; 
-
-  var unrelated_new_2_bdy = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_2_bdy = unrelated_new_2_bdy ? unrelated_new_2_bdy[1] : ''; 
-
-  // U0 vs. R0 - body
-  var unrelated_new_bdy_3 = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_bdy_3 = unrelated_new_bdy_3 ? unrelated_new_bdy_3[1] : ''; 
-
-  var related_new_bdy_3 = sampleRandomly20(remaining_body, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_bdy_3 = related_new_bdy_3 ? related_new_bdy_3[1] : '';
-
-  u0_u0_bdy_1.push({R0: related_new_body_1}, {U0: unrelated_new_bdy}, {U0: unrelated_new_bdy_3})
-  u0_u0_bdy_2.push({R0: related_new_body_2}, {U0: unrelated_new_2_bdy}, {R0: related_new_bdy_3})
-}
-
-
-u0_u0_bdy_1= u0_u0_bdy_1.filter(item => item !== undefined);
-u0_u0_bdy_1 = u0_u0_bdy_1.slice(0,12)
-
-u0_u0_bdy_2 = u0_u0_bdy_2.filter(item => item !== undefined);
-u0_u0_bdy_2 = u0_u0_bdy_2.slice(0,12)
-
-
-
-// 4 trials U0 U0; R0 R0; U0 R0. - body 
-matched_pairs_body_raw = [];
-matched_pairs_body = [];
-for (let r = 0; r <12; r++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(u0_u0_bdy_1[r])[0], Object.values(u0_u0_bdy_2[r])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px"+
-              <p> Use the response scale to indicate which word you remember, and how confident you are in your response.<br><br></p>
-              <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                  <p>${displayedFirstWord}</p>
-              </div>
-              <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                  <p>${displayedSecondWord}</p>
-              </div>
+    var instructions_seq = {
+        type: jsPsychInstructions,
+        pages: [
+            `
+      <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1000px; margin: auto;">
+          <div style="text-align: center; width: 100%; font-size: 20px;">
+            <p><strong>Sequence-Generation Task</strong></p>
           </div>
-          `;
-
-  matched_pairs_body.push({
-  slider: htmlString
-  });
-
-  matched_pairs_body_raw.push({
-    pair: [u0_u0_bdy_1[r], u0_u0_bdy_2[r]]
-  });
-}
-
-var all_pairs_body = [];
-all_pairs_body = matched_pairs_body_raw.concat(pairs_body_raw)
-
-// 4 trials U0 U0; R0 R0; U0 R0. - countries 
-u0_u0_cntr_1 = [];
-u0_u0_cntr_2 = [];
-
-for (let m = 0; m < 4; m++) {
-  // R0 vs. R0 - countries  
-  var related_new_cntr_1 = sampleRandomly20(remaining_countries, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cntr_1 = related_new_cntr_1 ? related_new_cntr_1[1] : ''; 
-
-  var related_new_cntr_2 = sampleRandomly20(remaining_countries, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cntr_2 = related_new_cntr_2 ? related_new_cntr_2[1] : ''; 
-
-  // U0 vs U0 - countries
-  var unrelated_new_cntr = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_cntr = unrelated_new_cntr ? unrelated_new_cntr[1] : ''; 
-
-  var unrelated_new_2_cntr = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_2_cntr = unrelated_new_2_cntr ? unrelated_new_2_cntr[1] : ''; 
-
-  // U0 vs. R0 - body
-  var unrelated_new_cntr_3 = sampleRandomly20(remaining_unrelated, 1)[0].stimulus.match(/>([^<]+)</);
-  var unrelated_new_cntr_3 = unrelated_new_cntr_3 ? unrelated_new_cntr_3[1] : ''; 
-
-  var related_new_cntr_3 = sampleRandomly20(remaining_countries, 1)[0].stimulus.match(/>([^<]+)</);
-  var related_new_cntr_3 = related_new_cntr_3 ? related_new_cntr_3[1] : '';
-
-
-  u0_u0_cntr_1.push({R0: related_new_cntr_1}, {U0: unrelated_new_cntr}, {U0: unrelated_new_cntr_3})
-  u0_u0_cntr_2.push({R0: related_new_cntr_2}, {U0: unrelated_new_2_cntr}, {R0: related_new_cntr_3})
-}
-
-u0_u0_cntr_1 = u0_u0_cntr_1.filter(item => item !== undefined);
-u0_u0_cntr_1 = u0_u0_cntr_1.slice(0,12)
-
-u0_u0_cntr_2 = u0_u0_cntr_2.filter(item => item !== undefined);
-u0_u0_cntr_2 = u0_u0_cntr_2.slice(0,12)
-
-// 4 trials U0 U0; R0 R0; U0 R0. - body 
-
-matched_pairs_cntr = [];
-matched_pairs_cntr_raw = [];
-for (let r = 0; r < 12; r++) {
-  var [displayedFirstWord, displayedSecondWord] = shuffleWords(Object.values(u0_u0_cntr_1[r])[0], Object.values(u0_u0_cntr_2[r])[0]);
-  var htmlString = `<div style="width:800px;font-family: Monospace; font-size:28px"+
-              <p> Use the response scale to indicate which word you remember, and how confident you are in your response.<br><br></p>
-              <div style="width:240px; float: left;font-family: Monospace; font-size:28px">
-                  <p>${displayedFirstWord}</p>
-              </div>
-              <div style="width:240px; float: right;font-family: Monospace; font-size:28px">
-                  <p>${displayedSecondWord}</p>
-              </div>
+          <div style="text-align: left; width: 100%;">
+            <p>In each round, there was <strong>one winning option</strong> (e.g., "Section 1-F"). We are interested in determining how much of an intuitive sense you have gained for the <strong>order</strong> in which the options were the "winning" ones across rounds (e.g., round 1: "Section 1-C", round 2: "Section 3-E", \u2026).</p>
+            <p>Please show us your understanding by <strong>generating a new sequence of winning options</strong> across 49 rounds. After clicking on the "Start" button, the six sections with the six options each will be displayed again and you can choose one option in each of the 49 trials by clicking on one of the corresponding buttons, as before. For example, the chosen option in trial 1 represents the "winning" option in round 1, the chosen option in trial 2 represents the "winning" option in round 2, and so on. After making a choice, you will be asked to report how confident you feel about that choice.</p>
+            <p>If you noticed any other patterns in the original sequence \u2014 such as certain options winning more often, particular transitions between sections and winners, or changes in the temporal order of winning options (e.g., Section 1-A, Section 3-A, Section 5-B --> Section 1-B, Section 3-B, Section 5-A) \u2014 please try to reflect those patterns in your new sequence as well.</p>
+            <p>Don't worry about reproducing the exact original order. Just aim to create a sequence that feels as similar as possible to the original one.</p>
+            <p>This task and two additional questions at the end comprise the final part of the experiment.</p>
           </div>
-          `;
+      </div>
+    `
+        ],
+        show_clickable_nav: true,  // enables navigation buttons
+        button_label_next: "Start"
 
-  matched_pairs_cntr.push({
-  slider: htmlString
-  });
+    };
 
-  matched_pairs_cntr_raw.push({
-    pair: [u0_u0_cntr_1[r], u0_u0_cntr_2[r]]
-  });
-}
-
-
-
-var trial_slider = {
-    type: jsPsychHtmlSliderResponse,
-    stimulus: jsPsych.timelineVariable('slider'),
-    pair: jsPsych.timelineVariable('pair'),
-    save_trial_parameters: {pair: true, stimulus: true},
-    require_movement: true,
-    slider_start: 0,
-    min:-100, 
-    max:100,
-    labels: ['<span style ="font-family: Monospace; font-size:20px; margin:10px">100% positive</span>', 
-             '<span style ="font-family: Monospace; font-size:20px; margin:10px">pretty sure</span>', 
-             '<span style ="font-family: Monospace; font-size:20px; margin:10px">guess</span>', 
-             '' , 
-             '<span style ="font-family: Monospace; font-size:20px; margin:10px">guess</span>', 
-             '<span style ="font-family: Monospace; font-size:20px; margin:10px">pretty sure</span>', 
-             '<span style ="font-family: Monospace; font-size:20px; margin:10px">100% positive</span>'],
-};
-
-// create an in-between phase between the test lists
-var new_list = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: "<div style = 'font-family: Monospace; font-size:20px'> End of Block 1. Please press the SPACE key when you are ready to begin the next memory task</div>",
-    choices: ["Enter"]
-};
+    var seq_gen = {
+        timeline: [makeStartRecording("seqgen_instructions"), instructions_seq, stop_recording, seq, seq_end],
+        repetitions: 1,
+        randomize_order: false,
+        on_start: function () {
+            isPracticePhase = false;
+            isAcquisition = false;
+            isSeqGen = true;
+            isFinalRound = false;
+        }
+    };
 
 
-var all_pairs_cities = [];
-all_pairs_cities = matched_pairs_cities_raw.concat(pairs_cities_raw)
+    //------------------------------------
+    // RULE DETECTION
+    //------------------------------------
 
-var all_trials_cities= [];
-all_trials_cities = matched_pairs_cities.concat(cities_pairs);
+    // APPEARANCE (flex condition)
+    var rule_detection_appearance = {
+        type: jsPsychHtmlButtonResponse,
+        stimulus: `
+        <div style="font-size: 24px; margin-bottom: 20px; width: 900px;">
+            <p><strong>FINAL QUESTION 1/2</strong><p>
+        </div>
+            <div style="font-size: 18px; margin-bottom: 20px; width: 900px;">
+                <p>There was a <strong>rule</strong> during the task:</p>
+                <p>When <strong>Section 1</strong> contained the winner, option <strong>A</strong> won. When <strong>Section 2</strong> contained the winner, option <strong>B</strong> won. When <strong>Section 3</strong> contained the winner, option <strong>C</strong> won, and so forth, resulting in the following sequence of winning options:</p>
+                <p>1-A,</p><p>2-B,</p><p>3-C,</p><p>4-D,</p><p>5-E,</p><p>6-F</p>
+                <p><strong>When did you notice this rule?</strong></p>
+                <p>Please enter a number between 1 and 49 that indicates the round in which you noticed the rule.</p>
+                <p>If you did <strong>not</strong> notice this rule, please enter 50. Please answer honestly. There are no negative consequences if you do not know the correct answer.</p>
+                <input type="number" id="number-input" min="1" max="50"
+                    style="font-size: 16px; padding: 8px; width: 100px; text-align: center;">
+                <div id="error-message" style="color: red; margin-top: 10px; min-height: 20px;"></div>
+            </div>
+        `,
+        choices: ['Continue'],
+        button_html: '<button class="jspsych-btn" id="continue-btn">%choice%</button>',
+        data: {
+            user_number: null // Initialize data property
+        },
+        on_load: function() {
+            // Store reference to trial data
+            var trial = jsPsych.getCurrentTrial();
+            console.log('condition_assignment:', condition_assignment);
 
-// Add pair information to each "slider" trial
-for( var i = 0; i < all_trials_cities.length; i++){                 
-  pair = {pairs_1: all_pairs_cities[i].pair[0], 
-                                  pairs_2: all_pairs_cities[i].pair[1]}
-  all_trials_cities[i]['pair'] = pair
-}
+            // Disable the continue button initially
+            document.getElementById('continue-btn').disabled = true;
+            document.getElementById('continue-btn').style.opacity = '0.5';
+
+            var input = document.getElementById('number-input');
+            var errorDiv = document.getElementById('error-message');
+            var continueBtn = document.getElementById('continue-btn');
+
+            // Validation function
+            function validateInput() {
+                var value = parseInt(input.value);
+
+                if (input.value === '') {
+                    errorDiv.textContent = '';
+                    continueBtn.disabled = true;
+                    continueBtn.style.opacity = '0.5';
+                    trial.data.user_number = null;
+                    return false;
+                } else if (isNaN(value)) {
+                    errorDiv.textContent = 'Please enter a valid number.';
+                    continueBtn.disabled = true;
+                    continueBtn.style.opacity = '0.5';
+                    trial.data.user_number = null;
+                    return false;
+                } else if (value < 1 || value > 50) {
+                    errorDiv.textContent = 'Please enter a number between 1 and 50.';
+                    continueBtn.disabled = true;
+                    continueBtn.style.opacity = '0.5';
+                    trial.data.user_number = null;
+                    return false;
+                } else {
+                    errorDiv.textContent = '';
+                    continueBtn.disabled = false;
+                    continueBtn.style.opacity = '1';
+                    // Store the valid number in trial data
+                    trial.data.user_number = value;
+                    return true;
+                }
+            }
+
+            // Add event listeners
+            input.addEventListener('input', validateInput);
+            input.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter' && validateInput()) {
+                    continueBtn.click();
+                }
+            });
+
+            // Focus on input
+            input.focus();
+        },
+        on_finish: function(data) {
+            // The user_number is already stored in data from the validation function
+            // No need to access DOM elements here
+        }
+    };
+
+    console.log('Trial object created:', rule_detection_appearance);
+
+    // Rule APPEARANCE estimate (flex condition)
+    var rule_appearance = {
+    type: jsPsychHtmlButtonResponse,
+    stimulus: `
+        <div style="font-size: 24px; margin-bottom: 20px; width: 900px;">
+            <p><strong>FINAL QUESTION 2/2</strong><p>
+        </div>
+        <div style="font-size: 18px; margin-bottom: 20px;">
+            <p>At some point during the task, this rule <strong>appeared</strong>.</p>
+            <p><strong>When do you think this rule appeared?</strong></p>
+            <p>Please enter a number between 1 and 49 that indicates the round in which you think the rule appeared.</p>
+            <input type="number" id="number-input" min="1" max="49"
+                   style="font-size: 16px; padding: 8px; width: 100px; text-align: center;">
+            <div id="error-message" style="color: red; margin-top: 10px; min-height: 20px;"></div>
+        </div>
+    `,
+    choices: ['Continue'],
+    button_html: '<button class="jspsych-btn" id="continue-btn">%choice%</button>',
+    data: {
+        user_number: null // Initialize data property
+    },
+    on_load: function() {
+        // Store reference to trial data
+        var trial = jsPsych.getCurrentTrial();
+
+        // Disable the continue button initially
+        document.getElementById('continue-btn').disabled = true;
+        document.getElementById('continue-btn').style.opacity = '0.5';
+
+        var input = document.getElementById('number-input');
+        var errorDiv = document.getElementById('error-message');
+        var continueBtn = document.getElementById('continue-btn');
+
+        // Validation function
+        function validateInput() {
+            var value = parseInt(input.value);
+
+            if (input.value === '') {
+                errorDiv.textContent = '';
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                trial.data.user_number = null;
+                return false;
+            } else if (isNaN(value)) {
+                errorDiv.textContent = 'Please enter a valid number.';
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                trial.data.user_number = null;
+                return false;
+            } else if (value < 1 || value > 49) {
+                errorDiv.textContent = 'Please enter a number between 1 and 49.';
+                continueBtn.disabled = true;
+                continueBtn.style.opacity = '0.5';
+                trial.data.user_number = null;
+                return false;
+            } else {
+                errorDiv.textContent = '';
+                continueBtn.disabled = false;
+                continueBtn.style.opacity = '1';
+                // Store the valid number in trial data
+                trial.data.user_number = value;
+                return true;
+            }
+        }
+
+        // Add event listeners
+        input.addEventListener('input', validateInput);
+        input.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter' && validateInput()) {
+                continueBtn.click();
+            }
+        });
+
+        // Focus on input
+        input.focus();
+        },
+    on_finish: function(data) {
+        // The user_number is already stored in data from the validation function
+        // No need to access DOM elements here
+        }
+    };
 
 
-var cities_testPhase = {
-  timeline: [fixation, trial_slider],
-  timeline_variables: all_trials_cities,
-  randomize_order: true,
-}
-
-var all_trials_countries = [];
-all_trials_countries = matched_pairs_cntr.concat(countries_pairs);
-
-var all_trials_body= [];
-var all_trials_body = matched_pairs_body.concat(body_pairs);
-
-// Add pair information to each "slider" trial
-for( var i = 0; i < all_trials_body.length; i++){
-  pair = {pairs_1: all_pairs_body[i].pair[0], 
-                                  pairs_2: all_pairs_body[i].pair[1]}
-  all_trials_body[i]['pair'] = pair
-}
-
-var body_testPhase = {
-  timeline: [fixation, trial_slider],
-  timeline_variables:  all_trials_body,
-  randomize_order: true
-}
+    var rule_det_flex = {
+        timeline: [rule_detection_appearance, rule_appearance],
+        repetitions: 1,
+        randomize_order: false,
+        conditional_function: function () {
+            // execute timeline if condition_assignment = 'cons', skip if condition_assignment = 'flex'
+            if (condition_assignment == 'cons') {
+                return false;
+            } else if (condition_assignment == 'flex') {
+                return true;
+            }
+        }
+    };
 
 
+    //------------------------------------
+    // Think-aloud recording instructions
+    //------------------------------------
 
-// create complete trials, on which the stimulus (CITIES) is presented followed by a fixation cross
-var test_procedure_cities = {
-  timeline: [fixation, test],
-  timeline_variables: cities_list,
-  randomize_order: true
-}
-
-
-var all_pairs_cntr = [];
-all_pairs_cntr = matched_pairs_cntr_raw.concat(pairs_countries_raw)
-
-var all_trials_countries= [];
-var all_trials_countries = matched_pairs_cntr.concat(countries_pairs);
-
-// Add pair information to each "slider" trial
-for( var i = 0; i < all_trials_countries.length; i++){
-                 
-  pair = {pairs_1: all_pairs_cntr[i].pair[0], 
-                                  pairs_2: all_pairs_cntr[i].pair[1]}
-  all_trials_countries[i]['pair'] = pair
-}
+    var recording_instructions = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: "<div style='font-size: 24px; font-family: Monospace; color: red; max-width: 900px; margin: auto;'>" +
+            "<br><br>Throughout this experiment," +
+            "<br><br>we will be recording your audio because we want" +
+            "<br><br>to know how and why you are doing things.</div>" +
+            "<div style='font-size: 24px; font-family: Monospace; max-width: 900px; margin: auto;'>" +
+            "<br><br>Could you please talk us through how you are making your decisions." +
+            "<br><br>Simply speak out loud about your thought process during the experiment." +
+            "<br><br>Don't hesitate to share every detail - we are keen to understand all aspects" +
+            "<br>of how you reach your decision." +
+            "<br><br>Don't worry about how you phrase your sentences or your speaking style." +
+            "<br><br><strong>Just speak clearly and naturally.</strong></div>" +
+            "<br><br><br><span style='font-size: 28px; font-family: Monospace; color: black;'>Press the SPACE key when you are ready to continue</span>",
+        choices: [" "],
+    };
 
 
-var countries_testPhase = {
-  timeline: [fixation, trial_slider],
-  timeline_variables: all_trials_countries,
-  randomize_order: true
-}
-
-// create complete trials, on which the stimulus (COUNTRIES) is presented followed by a fixation cross
-var test_procedure_coutries = {
-  timeline: [fixation, test],
-  timeline_variables: countries_list,
-  randomize_order: true
-}
-
-// create complete trials, on which the stimulus (BODY PARTS) is presented followed by a fixation cross
-var test_procedure_body = {
-  timeline: [fixation, test],
-  timeline_variables: body_list,
-  randomize_order: true
-}
-
-// or via description of the difficulty 
-timeline = [
-  {
-     type: jsPsychSpeechRecording,
-     start: true
-  },  
-            
-  instruction_1,
-  instructions_1_2, 
-  instruction_1_3, 
-  instruction_1_4,
-  
-  test_procedure_cities, 
-  instruction_nBack, 
-  n_back_procedure, 
-  instruction_BeforeTestPhase,
-  cities_testPhase, 
-  instruction_btw_lists_1_2, 
-
-  test_procedure_body, 
-  instruction_nBack, 
-  n_back_procedure, 
-  body_testPhase, 
-  instruction_btw_lists_2_3,  
-  
-  test_procedure_coutries, 
-  instruction_nBack, 
-  n_back_procedure, 
-  countries_testPhase, 
-  instruction_end,
-  {
-    type: jsPsychSpeechRecording,
-    start: false
-  }
-]
-                     
-console.log(timeline)
-jsPsych.run(timeline);
+    //------------------------------------
+    // Put it all in a timeline
+    //------------------------------------
 
 
+    var timeline = [
+        welcome,
+        consent,
+        { type: jsPsychSpeechRecording, start: true },
+        fullscreen_on,
+        recording_instructions,
+        makeStartRecording("instructions"), instructions, stop_recording,
+        makeStartRecording("practice"), practice, stop_recording,
+        start_exp,
+        choice_task,
+        transfer,
+        expect_check,
+        seq_gen,
+        makeStartRecording("ruledetection"), rule_det_flex, stop_recording
+    ]
+
+    // Stop recording confirmation dialog before final save
+    timeline.push({
+        type: jsPsychSpeechRecording,
+        start: false
+    });
+
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '<span style="display: flex;flex-direction: column;text-align: left;width: 50vw;">'
+            + '<p>Thanks for your participation. Press any key to end the experiment.</p>',
+        choices: "ALL_KEYS"
+    });
+
+    timeline.push({
+        type: jsPsychHtmlKeyboardResponse,
+        fullscreen_mode: true,
+        stimulus: '<span style="display: flex;flex-direction: column;text-align: left;width: 50vw;">'
+            + '<h3>Your redirect link is:<a target="_blank" href="https://app.prolific.com/submissions/complete?cc=C1I5XMZP">https://app.prolific.com/submissions/complete?cc=C1I5XMZP</a></h3>'
+            + '<h3>Your redirect code for prolific is C1I5XMZP.</h3>'
+            + '<p>Now you can end the experiment.</p>',
+        choices: ""
+    });
+
+
+    //------------------------------------
+    // Set up and run the experiment
+    //------------------------------------
+
+    // Execute timeline.
+    jsPsych.run(timeline);
 
 
 </script>

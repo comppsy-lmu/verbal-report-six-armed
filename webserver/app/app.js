@@ -29,6 +29,17 @@ app.use(cors());
 // set upload limit
 app.use(express.json({ limit: '999mb' }));
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const INDEX_REGEX = /^[a-zA-Z0-9_]+$/;
+
+function isValidUuid(uuid) {
+    return typeof uuid === 'string' && UUID_REGEX.test(uuid);
+}
+
+function isValidIndex(index) {
+    return typeof index === 'string' && INDEX_REGEX.test(index);
+}
+
 // bind public folder
 app.use(express.static('public'))
 
@@ -53,30 +64,31 @@ app.post('/save', (req, res) => {
         res.status(400);
         return res.send('Missing audio');
     }
-    if (!req.body.uuid) {
-        logger.warn('Missing uuid')
+    if (!req.body.uuid || !isValidUuid(req.body.uuid)) {
+        logger.warn('Missing or invalid uuid')
         res.status(400);
-        return res.send('Missing uuid');
+        return res.send('Missing or invalid uuid');
     }
-    if (!req.body.index) {
-        logger.warn('Missing index')
+    if (!req.body.index || !isValidIndex(req.body.index)) {
+        logger.warn('Missing or invalid index')
         res.status(400);
-        return res.send('Missing index');
+        return res.send('Missing or invalid index');
     }
 
-    logger.info('Try to save recording for participant: ' + req.body.uuid);
-    // convert base 64 to wav and save it
+    const uuid = req.body.uuid;
+    const audio_filename = "audio_" + req.body.index + "tmp.wav";
+
+    logger.info('Try to save recording for participant: ' + uuid);
     const buffer = Buffer.from(
-        req.body.audio.split('base64,')[1],  // only use encoded data after "base64,"
+        req.body.audio.split('base64,')[1],
         'base64'
     )
 
-    audio_filename = "audio_" + req.body.index + "tmp.wav";
-
-    uuid = req.body.uuid
     fs.writeFile(path.join(config.PATH_TO_RESSOURCES, uuid, audio_filename), buffer, function (err) {
         if (err) {
-            return logger.error(err);
+            logger.error(err);
+            res.status(500);
+            return res.send('Failed to save audio');
         }
 
         convert_audio(path.join(config.PATH_TO_RESSOURCES, uuid, audio_filename));
@@ -89,11 +101,9 @@ app.post('/save', (req, res) => {
 });
 
 app.post('/createParticipant', (req, res) => {
-    // create user id
-    uuid = uuidv4();
+    const uuid = uuidv4();
     logger.info('Created new participant: ' + uuid);
 
-    // create directory
     fs.mkdirSync(path.join(config.PATH_TO_RESSOURCES, uuid), 0o777);
 
     return res.status(200).send({ uuid: uuid });
@@ -105,41 +115,36 @@ app.post('/saveTrialData', (req, res) => {
         res.status(400);
         return res.send('Missing trial_data');
     }
-    if (!req.body.uuid) {
-        logger.warn('Missing uuid')
+    if (!req.body.uuid || !isValidUuid(req.body.uuid)) {
+        logger.warn('Missing or invalid uuid')
         res.status(400);
-        return res.send('Missing uuid');
+        return res.send('Missing or invalid uuid');
     }
 
-    uuid = req.body.uuid
+    const uuid = req.body.uuid;
 
     logger.info("Save trial data for participant: " + uuid);
-    // save trial data
-    fs.writeFile(path.join(config.PATH_TO_RESSOURCES, uuid, 'trial_data.txt'), JSON.stringify(req.body.trial_data), function (err) {
+    fs.writeFile(path.join(config.PATH_TO_RESSOURCES, uuid, 'trial_data.csv'), req.body.trial_data, function (err) {
         if (err) {
-            return logger.error(err);
+            logger.error(err);
+            res.status(500);
+            return res.send('Failed to save trial data');
         }
 
-        /* wav_files = listWavFiles(path.join(config.PATH_TO_RESSOURCES, uuid));
-        for (let i = 0; i < wav_files.length; i++) {
-            convert_audio(wav_files[i]);
-        } */
-
         res.status(200);
-
         return res.send({ uuid: uuid });
     })
 
 });
 
 app.delete('/delete', (req, res) => {
-    if (!req.body.uuid) {
-        logger.warn('Missing uuid')
+    if (!req.body.uuid || !isValidUuid(req.body.uuid)) {
+        logger.warn('Missing or invalid uuid')
         res.status(400);
-        return res.send('Missing uuid');
+        return res.send('Missing or invalid uuid');
     }
 
-    uuid = req.body.uuid
+    const uuid = req.body.uuid;
     fs.rmSync(path.join(config.PATH_TO_RESSOURCES, uuid), { recursive: true, force: true });
     res.status(200);
 
@@ -148,7 +153,7 @@ app.delete('/delete', (req, res) => {
 
 function convert_audio(file) {
     logger.info("Converting file: " + file)
-    new_filename = file.slice(0, -7) + ".wav"
+    const new_filename = file.slice(0, -7) + ".wav"
     var outStream = fs.createWriteStream(new_filename);
     var command = new FfmpegCommand();
     command

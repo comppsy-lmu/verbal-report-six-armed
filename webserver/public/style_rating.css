@@ -1,0 +1,176 @@
+body{
+    background: #fff;
+  }
+
+
+  #experiment-container {
+    position: relative;
+  }
+
+  #global-info-canvas {
+    width: 800px;
+    height: 400px;
+    position: absolute;
+    top: 10px; /* Position it a bit from the top */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  #feedback-canvas {
+    width: 300px;
+    height: 150px;
+    position: absolute;
+    bottom: -100px; 
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    pointer-events: none;
+    background-color: white;
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    justify-items: center;
+    margin-top: 10px;
+    padding-top: 120px;
+    z-index: 2;
+  }
+  .section {
+    border: 2px solid #888;
+    border-radius: 12px;
+    position: relative;
+    z-index: 2;
+    padding: 25px;
+    text-align: center;
+    background-color: #eef1f5;
+    width: 400px;
+    height: auto;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    font-size: 28px;
+  }
+  
+  canvas {
+    margin-bottom: 8px; /* reduce space below canvas */
+    height: 50px; /* reduce canvas height to save space */
+  }
+
+  .button-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .choice-btn {
+    padding: 10px 16px;
+    font-size: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #333;
+    background-color: #fff;
+    width: 70px;
+    height: 70px;
+  }
+  .choice-btn:hover {
+    background-color: #cce5ff;
+  }
+
+  .choice-btn:disabled {
+    background-color: #ddd;
+    color: #888;
+    border-color: #aaa;
+    cursor: not-allowed;
+  }
+  
+  .choice-btn:disabled:hover {
+    background-color: #ddd; /* Remove hover effect */
+  }
+  
+  .slider-wrapper{
+    position: relative;
+    margin: 1rem;
+  }
+
+  .slider{
+    appearance: none;
+    -webkit-appearance: none;
+    width: 450px;
+    height: 40px;
+    background-color: #ddd;
+    border-radius: 25px;
+  }
+
+  .slider::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: black;
+    cursor: pointer;
+  }
+
+
+  .slider::-moz-range-thumb{ /*firefox browser*/
+    -webkit-appearance: none;
+    appearance: none;
+    position: relative;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: black;
+    cursor: pointer;
+  }
+
+  .slider-wrapper span{
+    position: absolute;
+    bottom: 50%;
+    transform: translateY(50%);
+    margin-left: 20px;
+    font-size: 2rem;
+    }
+
+
+    /* Style the text */
+    .slider-label {
+        font-size: 18px;
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+      }
+  
+
+    /* Hide the default jsPsych button */
+    .jspsych-btn {
+        /*display: none;*/
+        color: black;
+        background-color: white;
+    }
+    /* Display button */
+    .confirm-button {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 5px;
+        cursor: not-allowed;
+    }
+    
+    .confirm-button:enabled {
+        cursor: pointer;
+        background-color: #7d7d7ddf;
+    }
+
+    .confirm-button:disabled {
+        cursor: default; /* Keep the default cursor (or you can use 'pointer' if you want the pointer even when disabled) */
+        background-color: #ffffff;
+    }

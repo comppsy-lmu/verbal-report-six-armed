@@ -1,5 +1,6 @@
 let base64blob = "";
 let uuid_jsRecording = "";
+let selectedDeviceId = null;
 /**
  * Utility function for recording audio
  */
@@ -23,9 +24,13 @@ var audioRecorder = {
         else {
             //Feature is supported in browser                 
             //create an audio stream
-            return navigator.mediaDevices.getUserMedia({ audio: true }/*of type MediaStreamConstraints*/)
+            var audioConstraints = selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : true;
+            return navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
                 //returns a promise that resolves to the audio stream
                 .then(stream /*of type MediaStream*/ => {
+
+                    var track = stream.getAudioTracks()[0];
+                    console.log("Recording with: " + track.label);
 
                     //save the reference of the stream to be able to stop it when necessary
                     audioRecorder.streamBeingCaptured = stream;
@@ -119,7 +124,7 @@ const sendData = (trial_data) => {
         headers: headers,
         body: JSON.stringify({
             uuid: uuid_jsRecording,
-            trial_data: trial_data.slice(1, -1)
+            trial_data: trial_data
         })
     }).then(response => {
         if (response.ok) return response;
@@ -252,14 +257,24 @@ var jsPsychSpeechRecording = (function (jspsych) {
             this.jsPsych = jsPsych;
             this.html_info =
                 `
-                <div>
-                In our study we want to record your voice. Please give permission that we can use your microphone. Please click <b>"Allow"</b> to proceed.
+                <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1100px; margin: auto;">
+                    <div style="text-align: center; width: 100%; font-size: 20px;">
+                        <p><strong>Microphone Permission</strong></p>
+                    </div>
+                    <div style="text-align: left; width: 100%;">
+                        <p>In our study we want to record your voice. Please give permission to use your microphone by clicking <strong>"Allow"</strong> in the browser prompt.</p>
+                    </div>
                 </div>
                 `;
             this.html_permission_denied =
                 `
-                <div>
-                You must give permission to record audio. Please allow the use of your microphone in your browser settings and reload the website.
+                <div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1100px; margin: auto;">
+                    <div style="text-align: center; width: 100%; font-size: 20px;">
+                        <p><strong>Permission Required</strong></p>
+                    </div>
+                    <div style="text-align: left; width: 100%;">
+                        <p>You must give permission to record audio. Please allow the use of your microphone in your browser settings and reload the website.</p>
+                    </div>
                 </div>
                 `;
         }
@@ -270,7 +285,7 @@ var jsPsychSpeechRecording = (function (jspsych) {
                 audioRecorder.start()
                     .then(() => {
                         cancelAudioRecording();
-                        this.createParticipant();
+                        this.showMicSelector(display_element);
                     })
                     .catch(error => { //on error
                         // Permission not granted
@@ -296,9 +311,35 @@ var jsPsychSpeechRecording = (function (jspsych) {
             }
         }
 
-        /**
-         * Creates a participant by sending a POST request to the server.
-         */
+        showMicSelector(display_element) {
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                var mics = devices.filter(d => d.kind === 'audioinput');
+                if (mics.length <= 1) {
+                    if (mics.length === 1) selectedDeviceId = mics[0].deviceId;
+                    this.createParticipant();
+                    return;
+                }
+                var html = '<div style="display: flex; flex-direction: column; align-items: center; padding: 10px; gap: 10px; max-width: 1100px; margin: auto;">' +
+                    '<div style="text-align: center; width: 100%; font-size: 20px;"><p><strong>Select Microphone</strong></p></div>' +
+                    '<div style="text-align: center; width: 100%;">' +
+                    '<p>Please select the microphone you would like to use:</p>' +
+                    '<select id="mic-select" style="font-size:16px;padding:5px;margin:10px 0;">';
+                mics.forEach(function(mic, i) {
+                    html += '<option value="' + mic.deviceId + '">' + (mic.label || 'Microphone ' + (i + 1)) + '</option>';
+                });
+                html += '</select><br>' +
+                    '<button id="mic-confirm" style="font-size:16px;padding:8px 20px;margin-top:10px;cursor:pointer;">Confirm</button>' +
+                    '</div></div>';
+                display_element.innerHTML = html;
+                var self = this;
+                document.getElementById('mic-confirm').addEventListener('click', function() {
+                    selectedDeviceId = document.getElementById('mic-select').value;
+                    console.log("Selected microphone: " + document.getElementById('mic-select').selectedOptions[0].text);
+                    self.createParticipant();
+                });
+            });
+        }
+
         createParticipant() {
             const headers = {
                 'Access-Control-Allow-Origin': '*',
