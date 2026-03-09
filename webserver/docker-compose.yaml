@@ -1,11 +1,11 @@
 services:
-  web:
+  web-verbal-rike:
     init: true
     build: .
     # change if needed (adjusts the permission of the generated folder)
     user: 1000:1000
     ports:
-      - "8090:8080"
+      - "8005:8080"
     volumes:
       # sync ressources folder
       - ../ressources:/usr/src/app/ressources
