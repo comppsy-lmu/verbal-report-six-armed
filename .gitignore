@@ -19,7 +19,7 @@ logs/*
 
 test
 
-*.png
+ressources/**/*.png
 *.wav
 #*.csv
 *.zip
