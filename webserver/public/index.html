@@ -109,8 +109,6 @@
     counter.trial = 1;
     counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
 
-    var currentPhase = "";
-    var phaseRound = 0;
 
 
     //------------------------------------
@@ -226,12 +224,17 @@ function shuffleArray(array) {
 
 // ---- Start/Stop recording trial nodes ----
 
-function makeStartRecording(phase) {
+var recordingState = { counters: {}, currentLabel: "", globalIndex: 0 };
+
+function createStartRecordingPoint(phase) {
     return {
         type: jsPsychCallFunction,
         async: true,
         func: function(done) {
-            if (phase && currentPhase !== phase) { currentPhase = phase; phaseRound = 0; }
+            if (!recordingState.counters[phase]) recordingState.counters[phase] = 0;
+            recordingState.counters[phase]++;
+            recordingState.globalIndex++;
+            recordingState.currentLabel = String(recordingState.globalIndex).padStart(3, '0') + "_" + phase + "_" + recordingState.counters[phase];
             audioRecorder.start()
                 .then(function() { done(); })
                 .catch(function(error) { console.log("Recording start error:", error); done(); });
@@ -246,8 +249,7 @@ var stop_recording = {
         audioRecorder.stop()
             .then(audioAsblob => {
                 blobToBase64(audioAsblob).then(res => {
-                    phaseRound++;
-                    sendAudio(res, currentPhase + "_" + phaseRound);
+                    sendAudio(res, recordingState.currentLabel);
                     done();
                 });
             })
@@ -556,7 +558,7 @@ var stop_recording = {
 
 
     var choice_task = {
-        timeline: [makeStartRecording("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
+        timeline: [createStartRecordingPoint("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 24,
         randomize_order: false,
         on_timeline_start: function () {
@@ -579,7 +581,7 @@ var stop_recording = {
 
 
     var transfer = {
-        timeline: [makeStartRecording("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
+        timeline: [createStartRecordingPoint("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 24,
         randomize_order: false,
         on_timeline_start: function () {
@@ -603,7 +605,7 @@ var stop_recording = {
 
 
     var expect_check = { // Section 1-C winner (same for both conditions)
-        timeline: [makeStartRecording("expectcheck"), pred_section_trial, confidence, start_round, if_node_final, feedback, round_end, stop_recording],
+        timeline: [createStartRecordingPoint("expectcheck"), pred_section_trial, confidence, start_round, if_node_final, feedback, round_end, stop_recording],
         repetitions: 1,
         randomize_order: false,
         on_timeline_start: function () {
@@ -1033,7 +1035,7 @@ var stop_recording = {
     };
 
     var seq_gen = {
-        timeline: [makeStartRecording("seqgen_instructions"), instructions_seq, stop_recording, makeStartRecording("seqgen"), seq, seq_end, stop_recording],
+        timeline: [createStartRecordingPoint("seqgen_instructions"), instructions_seq, stop_recording, createStartRecordingPoint("seqgen"), seq, seq_end, stop_recording],
         repetitions: 1,
         randomize_order: false,
         on_start: function () {
@@ -1268,14 +1270,14 @@ var stop_recording = {
         { type: jsPsychSpeechRecording, start: true },
         fullscreen_on,
         recording_instructions,
-        makeStartRecording("instructions"), instructions, stop_recording,
-        makeStartRecording("practice"), practice, stop_recording,
+        createStartRecordingPoint("instructions"), instructions, stop_recording,
+        createStartRecordingPoint("practice"), practice, stop_recording,
         start_exp,
         choice_task,
         transfer,
         expect_check,
         seq_gen,
-        makeStartRecording("ruledetection"), rule_det_flex, stop_recording
+        createStartRecordingPoint("ruledetection"), rule_det_flex, stop_recording
     ]
 
     // Stop recording confirmation dialog before final save
