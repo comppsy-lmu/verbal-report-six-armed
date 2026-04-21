@@ -72,10 +72,30 @@
             counter.round += 1; // 24 rounds acquisition, 24 rounds transfer, 1 round expectation check (flex condition)
             counter.trial = 1;
             counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
+            roundsInBlock += 1;
         }
     };
 
 
+    var keep_talking_reminder = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `<p style="color: red; font-weight: bold; font-size: 24px; text-align: center;">
+            Reminder:<br></br>Please keep talking!
+        </p>
+        <p style="text-align: center;">Press any key to continue.</p>`
+    };
+    
+    var if_node_reminder = {
+        timeline: [keep_talking_reminder],
+        conditional_function: function () {
+            console.log("roundsInBlock:", roundsInBlock);
+            return roundsInBlock % 6 === 0 && roundsInBlock > 0;
+        }
+    };
+    
+    var roundsInBlock = 0;
+
+    
     // define experiment end message
     var expt_end = {
         type: jsPsychHtmlKeyboardResponse,
@@ -558,7 +578,7 @@ var stop_recording = {
 
 
     var choice_task = {
-        timeline: [createStartRecordingPoint("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
+        timeline: [createStartRecordingPoint("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, if_node_reminder, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 24,
         randomize_order: false,
         on_timeline_start: function () {
@@ -581,7 +601,7 @@ var stop_recording = {
 
 
     var transfer = {
-        timeline: [createStartRecordingPoint("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, stop_recording],
+        timeline: [createStartRecordingPoint("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, if_node_reminder, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 24,
         randomize_order: false,
         on_timeline_start: function () {
@@ -641,6 +661,7 @@ var stop_recording = {
         stimulus: `
             <p style="font-size: 20px;"><strong>You're ready to start the experiment now.</strong></p>
             <p>Remember, the goal of the experiment is to <strong>find the winner!</strong></p>
+            <p style="color: red;"><strong>Please keep talking!</strong></p>
             <br></br>
             <p>Press any key to begin.</p>
             `,
@@ -1025,6 +1046,7 @@ var stop_recording = {
             <p>If you noticed any other patterns in the original sequence \u2014 such as certain options winning more often, particular transitions between sections and winners, or changes in the temporal order of winning options (e.g., Section 1-A, Section 3-A, Section 5-B --> Section 1-B, Section 3-B, Section 5-A) \u2014 please try to reflect those patterns in your new sequence as well.</p>
             <p>Don't worry about reproducing the exact original order. Just aim to create a sequence that feels as similar as possible to the original one.</p>
             <p>This task and two additional questions at the end comprise the final part of the experiment.</p>
+            <p style="color: red;"><strong>Please keep talking!</strong></p>
           </div>
       </div>
     `
