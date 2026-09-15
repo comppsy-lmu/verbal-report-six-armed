@@ -1,4 +1,4 @@
-"""The cluster/category scheme from vr_prompts-v2_1.xlsx."""
+"""The cluster/category scheme from vr_prompts-v3.xlsx."""
 
 import functools
 import random
