@@ -4,7 +4,7 @@ from sklearn.preprocessing import StandardScaler
 
 import pipeline
 from extractors import base
-# from pipeline import evaluate
+from pipeline import evaluate
 
 pipeline.PROGRESS = True
 # MODEL = "phi4-mini:latest"
@@ -55,7 +55,7 @@ for extractor in SWEEP:
     unit_features(extractor)
     if EXPORT_CALLS:
         export_calls(extractor)
-#    for classifier in CLASSIFIERS:
-#        evaluate(make_pipeline(extractor, classifier), n_permutations=500)
+    for classifier in CLASSIFIERS:
+        evaluate(make_pipeline(extractor, classifier), n_permutations=500)
 
-# results_table()
+results_table()

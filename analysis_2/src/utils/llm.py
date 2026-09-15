@@ -45,7 +45,7 @@ def capture():
 
 
 def _complete(
-    messages: list[dict], response_format: dict, seed: int, model: str
+    messages: list[dict], response_format: dict, seed: int, model: str, temp: float
 ) -> str:
     content = ""
     for _ in range(TRIES):
@@ -55,7 +55,7 @@ def _complete(
             response_format=response_format,  # pyright: ignore[reportArgumentType]
             max_tokens=MAX_TOKENS,
             seed=seed,
-            temperature=0.6,
+            temperature=temp,
         )
         content = (response.choices[0].message.content or "").split("</think>")[-1]
         content = content.strip()
@@ -74,16 +74,23 @@ def judge(
     response_format: dict,
     seed: int = 0,
     model: str = DEFAULT_MODEL,
+    temperature: float = 0.6,
 ) -> dict:
 
     key = hashlib.sha256(
-        json.dumps([model, messages, response_format, seed], sort_keys=True).encode()
+        json.dumps(
+            [model, messages, response_format, seed, temperature], sort_keys=True
+        ).encode()
     ).hexdigest()
 
     with _db_lock:
         hit = db.execute("SELECT response FROM cache WHERE key = ?", (key,)).fetchone()
 
-    content = hit[0] if hit else _complete(messages, response_format, seed, model)
+    content = (
+        hit[0]
+        if hit
+        else _complete(messages, response_format, seed, model, temperature)
+    )
 
     # a model sometimes carries on chatting past the closing brace, so take the
     # object and ignore whatever follows
