@@ -25,7 +25,8 @@ class Segmenter(BaseEstimator, ABC):
 
     @abstractmethod
     def pool(self, scores: np.ndarray) -> np.ndarray:
-        """(units x categories) -> one score per category."""
+        """(units x categories) -> one score per category, or the units
+        untouched if they are to become features in their own right."""
 
 
 class Transcript(Segmenter):
@@ -43,13 +44,19 @@ class Transcript(Segmenter):
 
 class _Chunked(Segmenter, ABC):
     """Many units, so the scores need pooling: max = the behavior occurred at
-    all, mean = how much of the participant's speech it made up."""
+    all, mean = how much of the participant's speech it made up, none = keep
+    the units apart and let each one contribute its own features."""
 
     def __init__(self, pooling: str = "max"):
         self.pooling = pooling
 
     def pool(self, scores: np.ndarray) -> np.ndarray:
-        return POOL[self.pooling](scores, axis=0)
+        if self.pooling == "none":
+            # a unit the participant was silent in keeps its slot and scores
+            # zero. Dropping it would shift every later unit one place up and
+            # the units would stop lining up across participants.
+            return np.nan_to_num(scores)
+        return POOL[self.pooling](scores[~np.isnan(scores).all(axis=1)], axis=0)
 
 
 class Groups(_Chunked):

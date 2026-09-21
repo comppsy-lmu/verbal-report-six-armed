@@ -27,7 +27,7 @@ class TaxonomyExtractor(FeatureExtractor):
         self.level = level
 
     def unit_scores(self, participant: str) -> pd.DataFrame:
-        """One row per unit, one column per category, values in [0, 1] = the
+        """One row per unit (segment of speech), one column per category, values in [0, 1] = the
         fraction of seeds that picked it."""
         units = self.segments.split(self.scope.select(participant))
         if not units:
@@ -49,8 +49,18 @@ class TaxonomyExtractor(FeatureExtractor):
 
     def _extract(self, participant: str) -> dict[str, float]:
         scores = self.unit_scores(participant).to_numpy()
-        scores = scores[~np.isnan(scores).all(axis=1)]
-        if not len(scores):
+        if not len(scores) or np.isnan(scores).all():
             # silent participants should have been filterd out earlier
             raise ValueError(f"{participant} said nothing in {self.scope!r}")
-        return self.level.report(self.segments.pool(scores))
+        pooled = self.segments.pool(scores)
+        if pooled.ndim == 1:
+            return self.level.report(pooled)
+        # unpooled, so there is a vector per unit (segment of speech) rather
+        # than one in total. The level names each of them the same way, so the
+        # segmenter's own word for a unit and its number keep the names apart.
+        label = codebook.UNIT_LABEL[self.segments.prompt_granularity].lower()
+        return {
+            f"{label}{i}_{name}": value
+            for i, row in enumerate(pooled, 1)
+            for name, value in self.level.report(row).items()
+        }

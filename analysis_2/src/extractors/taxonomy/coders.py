@@ -219,6 +219,16 @@ def _topk_system(k: int, prompt_granularity: str, catalogue: str, memory: bool) 
     )
 
 
+# What a pick is worth given where the model ranked it. flat is the original
+# behavior, order ignored. graded pays rank 1 k times what rank k gets, so at
+# k=3 the ranks score 3, 2, 1.
+RANKINGS = {
+    "top1": lambda rank, k: 1.0 if rank == 1 else 0.0,
+    "flat": lambda rank, k: 1.0,
+    "graded": lambda rank, k: float(k - rank + 1),
+}
+
+
 class TopK(Coder):
     """One call per unit: the categories that apply, ranked, at most k of them."""
 
@@ -229,9 +239,11 @@ class TopK(Coder):
         memory: bool = False,
         shuffle: str = "none",
         model: str = llm.DEFAULT_MODEL,
+        ranking: str = "flat",
     ):
         super().__init__(n_seeds=n_seeds, memory=memory, shuffle=shuffle, model=model)
         self.k = k
+        self.ranking = ranking
 
     def _format(self, options: list[str]) -> dict:
         # the escape category is offered here, then dropped from the features
@@ -267,6 +279,11 @@ class TopK(Coder):
     def score(
         self, units: list[str], prompt_granularity: str, participant: str
     ) -> np.ndarray:
+        if self.ranking not in RANKINGS:
+            raise ValueError(
+                f"ranking must be one of {tuple(RANKINGS)}, got {self.ranking!r}"
+            )
+        weight = RANKINGS[self.ranking]
         categories = codebook.categories()
         index = {c: j for j, c in enumerate(categories)}
         out = np.zeros((len(units), len(categories)))
@@ -279,7 +296,8 @@ class TopK(Coder):
                 units, prompt_granularity, self._format(options), seed, system
             )
             for i, reply in enumerate(replies):
-                for picked in dict.fromkeys(reply["categories"]):
+                for rank, picked in enumerate(dict.fromkeys(reply["categories"]), 1):
                     if picked in index:  # the escape category falls through here
-                        out[i, index[picked]] += 1
-        return out / self.n_seeds
+                        out[i, index[picked]] += weight(rank, self.k)
+        # by the best a pick can score, so the result stays in [0, 1]
+        return out / (self.n_seeds * weight(1, self.k))

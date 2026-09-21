@@ -55,8 +55,16 @@ class FeatureExtractor(BaseEstimator, TransformerMixin, ABC):
                     mininterval=0,
                 )
             )
-        # via DataFrame so columns align by feature name, not by dict order
-        return pd.DataFrame(rows, index=participants)
+        # via DataFrame so columns align by feature name
+        df = pd.DataFrame(rows, index=participants)
+        if df.isna().any().any():
+            missing = df.columns[df.isna().any()].tolist()
+            raise ValueError(
+                f"participants came back with different features (e.g. "
+                f"{missing[:3]}). Unpooled segments need the same unit count "
+                f"for everyone."
+            )
+        return df
 
     @abstractmethod
     def _extract(self, participant: str) -> dict[str, float]: ...

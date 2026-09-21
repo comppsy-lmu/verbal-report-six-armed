@@ -29,15 +29,21 @@ def slug(config: str) -> str:
     return re.sub(r"[^0-9A-Za-z]+", "-", config).strip("-")[:200]
 
 
-def _calls_config(extractor) -> str:
-    """Names the set of requests an extractor makes, so configs that ask the
-    model the same things share one calls/per_unit file.
-    Only coder, scope and segments shape a request."""
+def scores_config(extractor) -> str:
+    """Names the per-unit scores, so configs that produce the same ones share a
+    file. Pooling and the level act on the scores afterwards, so they are out."""
     with config_context(print_changed_only=False):  # spell out every parameter
         config = " ".join(
             repr(o) for o in (extractor.coder, extractor.scope, extractor.segments)
         )
     return re.sub(r"pooling='\w+', ?", "", config)
+
+
+def calls_config(extractor) -> str:
+    """Names the set of requests, so configs that ask the model the same things
+    share one review file. Ranking only decides how a reply is read, and the
+    replies are the same either way, so it drops out too."""
+    return re.sub(r"ranking='\w+', ?", "", scores_config(extractor))
 
 
 def _filename(config: str) -> str:
@@ -111,7 +117,7 @@ def export_calls(extractor, limit: int | None = None) -> pd.DataFrame:
             "reasoning",
         ]
     ].sort_values(["participant", "unit", "seed"])
-    path = OUTPUT / "review" / _filename(_calls_config(extractor))
+    path = OUTPUT / "review" / _filename(calls_config(extractor))
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     print(f"{len(df)} calls -> review/{path.name}")
@@ -177,7 +183,7 @@ def unit_features(extractor, limit: int | None = None) -> pd.DataFrame:
     ]
     df = pd.DataFrame(rows)
 
-    path = OUTPUT / "features" / "per-unit" / _filename(_calls_config(extractor))
+    path = OUTPUT / "features" / "per-unit" / _filename(scores_config(extractor))
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     print(f"{len(df)} units x {len(df.columns) - 4} categories -> per-unit/{path.name}")
