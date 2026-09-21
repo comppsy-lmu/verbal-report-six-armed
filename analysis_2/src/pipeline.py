@@ -153,6 +153,31 @@ def _rough_fit_scores(model, X, y) -> np.ndarray:
     return scores[:, list(np.unique(y)).index(1)] if scores.ndim > 1 else scores
 
 
+def _describe_fit(model, X, y) -> dict[str, str]:
+    """Awkward to put this here, but oh well.
+    Which blocks a forward selector kept when fitted on everybody, and what
+    weight each got. Nothing for non forward selector models.
+
+    The leave-one-out folds each choose their own blocks, so this is the full model,
+    not the ones the auc measures."""
+    fitted = clone(model).fit(X, y)
+    selector = fitted[-1] if hasattr(fitted, "steps") else fitted
+    blocks = getattr(selector, "selected_", None)
+    if blocks is None:
+        return {}
+    if not blocks:
+        return {"selected": "(none)"}
+
+    described = {"selected": ", ".join(blocks)}
+    # nameable only when a block arrived as one column, as under MeanForward
+    weights = np.ravel(selector.model_.coef_)
+    if len(weights) == len(blocks):
+        described["coefficients"] = ", ".join(
+            f"{block} {weight:+.3f}" for block, weight in zip(blocks, weights)
+        )
+    return described
+
+
 def _metrics(model, X, y) -> dict[str, float]:
     """Overal stats for a given feature extraction"""
     return {
@@ -193,11 +218,12 @@ def unit_features(extractor, limit: int | None = None) -> pd.DataFrame:
 _RESULTS: list[dict] = []
 
 
-def results_table() -> pd.DataFrame:
-    """Every evaluate() of the run in one table."""
+def results_table(quiet: bool = False) -> pd.DataFrame:
+    """Every evaluate() of the run so far, in one table."""
     df = pd.DataFrame(_RESULTS)
     df.to_csv(OUTPUT / "results.csv", index=False)
-    print(f"{len(df)} models -> results.csv")
+    if not quiet:
+        print(f"{len(df)} models -> results.csv")
     return df
 
 
@@ -237,6 +263,7 @@ def evaluate(model, limit: int | None = None, n_permutations: int = 0, seed: int
         "n": len(y),
         "pos_rate": float(y.mean()),
         **observed,
+        **_describe_fit(model, X, y),
         "n_permutations": n_permutations,
     }
 
@@ -263,10 +290,13 @@ def evaluate(model, limit: int | None = None, n_permutations: int = 0, seed: int
         _write_permutations(result["model"], runs)
 
     _RESULTS.append(result)
+    # rewritten every time: the run is hours long and _RESULTS is only in memory
+    results_table(quiet=True)
 
     print(
         f"{result['model']}: n={result['n']} pos_rate={result['pos_rate']:.2f} "
         f"auc={result['auc']:.3f} rough_train={result['rough_train_auc']:.3f}"
+        + (f" selected=[{result['selected']}]" if "selected" in result else "")
         + (
             f" p={result['p']:.3f} ({n_permutations} permutations)"
             if n_permutations
