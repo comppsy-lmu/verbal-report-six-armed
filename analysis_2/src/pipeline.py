@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn import config_context
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import LeaveOneOut, cross_val_predict
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 from utils import data, llm
 from utils.paths import OUTPUT
@@ -134,23 +134,39 @@ def _name(model) -> str:
     return " ".join(config().split()) if callable(config) else type(model).__name__  # type: ignore
 
 
-def _loo_scores(model, X, y) -> np.ndarray:
-    """One out-of-sample score per participant, from a full leave-one-out pass."""
+CV = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=0)
+
+
+def _class1(fitted, X, y) -> np.ndarray:
+    """The fitted model's score for class 1, whichever method it offers."""
     # SVC and friends have no predict_proba unless asked for it
-    method = "predict_proba" if hasattr(model, "predict_proba") else "decision_function"
-    scores = cross_val_predict(model, X, y, cv=LeaveOneOut(), method=method)
-    # predict_proba columns follow np.unique(y), so find class 1, decision_function is already 1-D
-    return scores[:, list(np.unique(y)).index(1)] if scores.ndim > 1 else scores
-
-
-def _rough_fit_scores(model, X, y) -> np.ndarray:
-    """The same scores in a "training" sample, from a single fit on everything."""
-    fitted = clone(model).fit(X, y)
     method = (
         "predict_proba" if hasattr(fitted, "predict_proba") else "decision_function"
     )
     scores = getattr(fitted, method)(X)
+    # predict_proba columns follow np.unique(y), decision_function is already 1-D
     return scores[:, list(np.unique(y)).index(1)] if scores.ndim > 1 else scores
+
+
+def _fold_scores(model, X, y) -> tuple[np.ndarray, np.ndarray]:
+    """The auc within each fold, and each participant's mean out-of-fold score.
+
+    Scored inside the fold and averaged, never pooled across folds: a fold that
+    chose different features is a different model, and ranking its predictions
+    against another fold's measures the split rather than the participant."""
+    aucs = []
+    total, seen = np.zeros(len(y)), np.zeros(len(y))
+    for train, test in CV.split(X, y):
+        scores = _class1(clone(model).fit(X[train], y[train]), X[test], y)
+        aucs.append(roc_auc_score(y[test], scores))
+        total[test] += scores
+        seen[test] += 1
+    return np.array(aucs), total / seen
+
+
+def _rough_fit_scores(model, X, y) -> np.ndarray:
+    """The same scores in a "training" sample, from a single fit on everything."""
+    return _class1(clone(model).fit(X, y), X, y)
 
 
 def _describe_fit(model, X, y) -> dict[str, str]:
@@ -181,7 +197,7 @@ def _describe_fit(model, X, y) -> dict[str, str]:
 def _metrics(model, X, y) -> dict[str, float]:
     """Overal stats for a given feature extraction"""
     return {
-        "auc": float(roc_auc_score(y, _loo_scores(model, X, y))),
+        "auc": float(_fold_scores(model, X, y)[0].mean()),
         "rough_train_auc": float(roc_auc_score(y, _rough_fit_scores(model, X, y))),
     }
 
@@ -252,7 +268,7 @@ def _write_permutations(model: str, runs: list[dict]) -> None:
 
 
 def evaluate(model, limit: int | None = None, n_permutations: int = 0, seed: int = 0):
-    """Leave-one-out AUC, with an optional permutation p-value."""
+    """Cross-validated auc, with an optional permutation p-value."""
     pids, labels = cohort(limit)
     X = np.array(pids).reshape(-1, 1)
     y = labels[pids].to_numpy()
@@ -267,12 +283,9 @@ def evaluate(model, limit: int | None = None, n_permutations: int = 0, seed: int
         "n_permutations": n_permutations,
     }
 
+    out_of_fold = _fold_scores(model, X, y)[1]
     _write_predictions(
-        result["model"],
-        pids,
-        y,
-        _loo_scores(model, X, y),
-        cross_val_predict(model, X, y, cv=LeaveOneOut()),
+        result["model"], pids, y, out_of_fold, (out_of_fold > 0.5).astype(int)
     )
 
     if n_permutations:
