@@ -149,11 +149,7 @@ def _class1(fitted, X, y) -> np.ndarray:
 
 
 def _fold_scores(model, X, y) -> tuple[np.ndarray, np.ndarray]:
-    """The auc within each fold, and each participant's mean out-of-fold score.
-
-    Scored inside the fold and averaged, never pooled across folds: a fold that
-    chose different features is a different model, and ranking its predictions
-    against another fold's measures the split rather than the participant."""
+    """The auc within each fold, and each participant's mean out-of-fold score."""
     aucs = []
     total, seen = np.zeros(len(y)), np.zeros(len(y))
     for train, test in CV.split(X, y):
