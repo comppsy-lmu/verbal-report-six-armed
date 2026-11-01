@@ -573,7 +573,7 @@ var stop_recording = {
 
 
     var rule1 = {
-        timeline: [createStartRecordingPoint("rule1"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        timeline: [createStartRecordingPoint(condition_assignment == "simple-first" ? "rule1_simple" : "rule1_complex"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 12, //
         randomize_order: false,
         on_timeline_start: function () {
@@ -600,7 +600,7 @@ var stop_recording = {
 
 
     var rule2 = {
-        timeline: [createStartRecordingPoint("rule2"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        timeline: [createStartRecordingPoint(condition_assignment == "simple-first" ? "rule2_complex" : "rule2_simple"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
         repetitions: DEV_MODE ? DEV_ROUNDS : 12, //
         randomize_order: false,
         on_timeline_start: function () {
