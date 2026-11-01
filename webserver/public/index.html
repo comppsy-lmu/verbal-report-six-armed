@@ -44,8 +44,7 @@
     var study_id = jsPsych.data.getURLVariable('STUDY_ID');
     var session_id = jsPsych.data.getURLVariable('SESSION_ID');
     // pick a random condition for the subject at the start of the experiment
-    //var condition_assignment = jsPsych.randomization.sampleWithoutReplacement(['flex', 'cons'], 1)[0];
-    var condition_assignment = "flex"
+    var condition_assignment = jsPsych.randomization.sampleWithoutReplacement(['simple-first', 'complex-first'], 1)[0];
 
     jsPsych.data.addProperties({
         subject_id: subject_id,
@@ -69,9 +68,9 @@
         stimulus: "End of round. Take a break. Press any key to continue when you are ready.",
         on_finish: function (data) {
 
-            counter.round += 1; // 24 rounds acquisition, 24 rounds transfer, 1 round expectation check (flex condition)
+            counter.round += 1; // two random phases (12 rounds each), two rule phases (simple and complex) + one expectation check (round 49)
             counter.trial = 1;
-            counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
+            counter.n_rounds = 49;
             roundsInBlock += 1;
         }
     };
@@ -127,7 +126,7 @@
     var counter = {};
     counter.round = 0;
     counter.trial = 1;
-    counter.n_rounds = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49;
+    counter.n_rounds = 49;
 
 
 
@@ -135,7 +134,8 @@
     // Choice trials
     //------------------------------------
     let isPracticePhase = true; // set this to `false` when the task phase starts
-    let isAcquisition = false; // set this to "true" when acquisition phase starts, and again to "false" when transfer phase starts
+    let isRandom1 = false; // set this to "true" when first random phase starts, and again to "false" after round 12
+    let isRandom2 = false; // true for rounds 25-36
     let isFinalRound = false; // set this to "true" in the final round (no. 49)
     let isSeqGen = false; // set this to "true" when sequence-generation task starts (after the choice task)
 
@@ -282,7 +282,7 @@ var stop_recording = {
 
 
     // rounds
-    var round_flex = {
+    var round = {
         timeline_variables: task_stimuli_round,
         sample: {
             type: 'with-replacement',
@@ -314,41 +314,6 @@ var stop_recording = {
             console.log("Continuing to next round.");
             return true;
             }
-    };
-
-
-    var round_cons = {
-        timeline_variables: task_stimuli_round,
-        sample: {
-            type: 'with-replacement',
-            size: 1
-        },
-        timeline:
-            [{
-                type: jsPsychSixArmedBandit,
-                n_trials: 6,
-                choice_type: jsPsych.timelineVariable('choice_type')
-            }],
-        conditional_function: function() {
-            const data = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' });
-            const lastSixArmedTrial = jsPsych.data.get().filter({ trial_type: 'six-armed-bandit' }).last(1).values()[0];
-
-            console.log("Last Trial Data:", lastSixArmedTrial);
-
-            if (!lastSixArmedTrial) {
-            console.log("No previous trials. Starting first round.");
-            return true;
-            }
-
-            if (lastSixArmedTrial.choice === lastSixArmedTrial.correct_option && lastSixArmedTrial.round === counter.round) {
-            console.log("Ending early due to correct response.");
-            return false;
-            }
-
-            console.log("Continuing to next round.");
-            return true;
-            }
-
     };
 
 
@@ -387,30 +352,9 @@ var stop_recording = {
 
 
     // if_nodes for early stopping if correct option is chosen
-    var if_node_cons = {
-        timeline: [round_cons],
+    var if_node = {
+        timeline: [round],
         repetitions: 6, // max. 6 trials
-        conditional_function: function () {
-            // execute timeline if condition_assignment = 'cons', skip if condition_assignment = 'flex'
-            if ((condition_assignment == 'flex' && isAcquisition == true) || (condition_assignment == 'cons' && isAcquisition == false)) {
-                return false;
-            } else if ((condition_assignment == 'cons' && isAcquisition == true) || (condition_assignment == 'flex' && isAcquisition == false)) {
-                return true;
-            }
-        }
-    };
-
-    var if_node_flex = {
-        timeline: [round_flex],
-        repetitions: 6, // max. 6 trials
-        conditional_function: function () {
-            // execute timeline if condition_assignment = 'flex' & isAcquisition = true, skip if condition_assignment = 'cons'
-            if ((condition_assignment == 'cons' && isAcquisition == true) || (condition_assignment == 'flex' && isAcquisition == false)) {
-                return false;
-            } else if ((condition_assignment == 'flex' && isAcquisition == true) || (condition_assignment == 'cons' && isAcquisition == false)) {
-                return true;
-            }
-        }
     };
 
     var if_node_final = {
@@ -577,13 +521,14 @@ var stop_recording = {
     };
 
 
-    var choice_task = {
-        timeline: [createStartRecordingPoint("acquisition"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, if_node_reminder, stop_recording],
-        repetitions: DEV_MODE ? DEV_ROUNDS : 24,
+    var random1 = {
+        timeline: [createStartRecordingPoint("random1"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 12,
         randomize_order: false,
         on_timeline_start: function () {
             isPracticePhase = false;
-            isAcquisition = true;
+            isRandom1 = true;
+            isRandom2 = false;
             isSeqGen = false;
             isFinalRound = false;
 
@@ -600,19 +545,76 @@ var stop_recording = {
     };
 
 
-    var transfer = {
-        timeline: [createStartRecordingPoint("transfer"), pred_section_trial, confidence, start_round, if_node_cons, if_node_flex, feedback, round_end, if_node_reminder, stop_recording],
-        repetitions: DEV_MODE ? DEV_ROUNDS : 24,
+    var random2 = {
+        timeline: [createStartRecordingPoint("random2"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 12,
         randomize_order: false,
         on_timeline_start: function () {
             isPracticePhase = false;
-            isAcquisition = false;
+            isRandom1 = false;
+            isRandom2 = true;
             isSeqGen = false;
             isFinalRound = false;
+            // winners are keyed on absolute round numbers, so the shortened dev phases
+            // skip ahead to their first round (this hook runs every round)
+            if (DEV_MODE) counter.round = Math.max(counter.round, 25);
 
             const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
             currentShuffledLabels = shuffleArray(baseLabels);
 
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        }
+    };
+
+
+    var rule1 = {
+        timeline: [createStartRecordingPoint("rule1"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 12, //
+        randomize_order: false,
+        on_timeline_start: function () {
+            isPracticePhase = false;
+            isRandom1 = false;
+            isRandom2 = false;
+            isSeqGen = false;
+            isFinalRound = false;
+            if (DEV_MODE) counter.round = Math.max(counter.round, 13);
+
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+        
+        },
+        on_start: function() {
+            const match = correct_option.match(/Section \d+/);
+            section_only = match ? match[0] : null;
+
+            console.log("Correct Section: ", section_only)
+        }
+
+    };
+
+
+    var rule2 = {
+        timeline: [createStartRecordingPoint("rule2"), pred_section_trial, confidence, start_round, if_node, feedback, round_end, if_node_reminder, stop_recording],
+        repetitions: DEV_MODE ? DEV_ROUNDS : 12, //
+        randomize_order: false,
+        on_timeline_start: function () {
+            isPracticePhase = false;
+            isRandom1 = false;
+            isRandom2 = false;
+            isSeqGen = false;
+            isFinalRound = false;
+            if (DEV_MODE) counter.round = Math.max(counter.round, 37);
+
+
+            const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+            currentShuffledLabels = shuffleArray(baseLabels);
+        
         },
         on_start: function() {
             const match = correct_option.match(/Section \d+/);
@@ -631,9 +633,10 @@ var stop_recording = {
         on_timeline_start: function () {
             isFinalRound = true;
             isPracticePhase = false;
-            isAcquisition = false;
+            isRandom1 = false;
+            isRandom2 = false;
             isSeqGen = false;
-            counter.round = DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49
+            counter.round = 49
 
             const baseLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
             currentShuffledLabels = shuffleArray(baseLabels);
@@ -1007,12 +1010,12 @@ var stop_recording = {
         timeline_variables: task_stimuli_round,
         sample: {
             type: 'with-replacement',
-            size: DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49
+            size: DEV_MODE ? DEV_ROUNDS * 4 + 1 : 49
         },
         timeline:
             [{
                 type: jsPsychSixArmedBandit,
-                n_trials: DEV_MODE ? DEV_ROUNDS * 2 + 1 : 49,
+                n_trials: DEV_MODE ? DEV_ROUNDS * 4 + 1 : 49,
                 choice_type: jsPsych.timelineVariable('choice_type')
 
             },
@@ -1058,199 +1061,8 @@ var stop_recording = {
         randomize_order: false,
         on_start: function () {
             isPracticePhase = false;
-            isAcquisition = false;
             isSeqGen = true;
             isFinalRound = false;
-        }
-    };
-
-
-    //------------------------------------
-    // RULE DETECTION
-    //------------------------------------
-
-    // APPEARANCE (flex condition)
-    var rule_detection_appearance = {
-        type: jsPsychHtmlButtonResponse,
-        stimulus: `
-        <div style="font-size: 24px; margin-bottom: 20px; width: 900px;">
-            <p><strong>FINAL QUESTION 1/2</strong><p>
-        </div>
-            <div style="font-size: 18px; margin-bottom: 20px; width: 900px;">
-                <p>There was a <strong>rule</strong> during the task:</p>
-                <p>When <strong>Section 1</strong> contained the winner, option <strong>A</strong> won. When <strong>Section 2</strong> contained the winner, option <strong>B</strong> won. When <strong>Section 3</strong> contained the winner, option <strong>C</strong> won, and so forth, resulting in the following sequence of winning options:</p>
-                <p>1-A,</p><p>2-B,</p><p>3-C,</p><p>4-D,</p><p>5-E,</p><p>6-F</p>
-                <p><strong>When did you notice this rule?</strong></p>
-                <p>Please enter a number between 1 and 49 that indicates the round in which you noticed the rule.</p>
-                <p>If you did <strong>not</strong> notice this rule, please enter 50. Please answer honestly. There are no negative consequences if you do not know the correct answer.</p>
-                <input type="number" id="number-input" min="1" max="50"
-                    style="font-size: 16px; padding: 8px; width: 100px; text-align: center;">
-                <div id="error-message" style="color: red; margin-top: 10px; min-height: 20px;"></div>
-            </div>
-        `,
-        choices: ['Continue'],
-        button_html: '<button class="jspsych-btn" id="continue-btn">%choice%</button>',
-        data: {
-            user_number: null // Initialize data property
-        },
-        on_load: function() {
-            // Store reference to trial data
-            var trial = jsPsych.getCurrentTrial();
-            console.log('condition_assignment:', condition_assignment);
-
-            // Disable the continue button initially
-            document.getElementById('continue-btn').disabled = true;
-            document.getElementById('continue-btn').style.opacity = '0.5';
-
-            var input = document.getElementById('number-input');
-            var errorDiv = document.getElementById('error-message');
-            var continueBtn = document.getElementById('continue-btn');
-
-            // Validation function
-            function validateInput() {
-                var value = parseInt(input.value);
-
-                if (input.value === '') {
-                    errorDiv.textContent = '';
-                    continueBtn.disabled = true;
-                    continueBtn.style.opacity = '0.5';
-                    trial.data.user_number = null;
-                    return false;
-                } else if (isNaN(value)) {
-                    errorDiv.textContent = 'Please enter a valid number.';
-                    continueBtn.disabled = true;
-                    continueBtn.style.opacity = '0.5';
-                    trial.data.user_number = null;
-                    return false;
-                } else if (value < 1 || value > 50) {
-                    errorDiv.textContent = 'Please enter a number between 1 and 50.';
-                    continueBtn.disabled = true;
-                    continueBtn.style.opacity = '0.5';
-                    trial.data.user_number = null;
-                    return false;
-                } else {
-                    errorDiv.textContent = '';
-                    continueBtn.disabled = false;
-                    continueBtn.style.opacity = '1';
-                    // Store the valid number in trial data
-                    trial.data.user_number = value;
-                    return true;
-                }
-            }
-
-            // Add event listeners
-            input.addEventListener('input', validateInput);
-            input.addEventListener('keyup', function(e) {
-                if (e.key === 'Enter' && validateInput()) {
-                    continueBtn.click();
-                }
-            });
-
-            // Focus on input
-            input.focus();
-        },
-        on_finish: function(data) {
-            // The user_number is already stored in data from the validation function
-            // No need to access DOM elements here
-        }
-    };
-
-    console.log('Trial object created:', rule_detection_appearance);
-
-    // Rule APPEARANCE estimate (flex condition)
-    var rule_appearance = {
-    type: jsPsychHtmlButtonResponse,
-    stimulus: `
-        <div style="font-size: 24px; margin-bottom: 20px; width: 900px;">
-            <p><strong>FINAL QUESTION 2/2</strong><p>
-        </div>
-        <div style="font-size: 18px; margin-bottom: 20px;">
-            <p>At some point during the task, this rule <strong>appeared</strong>.</p>
-            <p><strong>When do you think this rule appeared?</strong></p>
-            <p>Please enter a number between 1 and 49 that indicates the round in which you think the rule appeared.</p>
-            <input type="number" id="number-input" min="1" max="49"
-                   style="font-size: 16px; padding: 8px; width: 100px; text-align: center;">
-            <div id="error-message" style="color: red; margin-top: 10px; min-height: 20px;"></div>
-        </div>
-    `,
-    choices: ['Continue'],
-    button_html: '<button class="jspsych-btn" id="continue-btn">%choice%</button>',
-    data: {
-        user_number: null // Initialize data property
-    },
-    on_load: function() {
-        // Store reference to trial data
-        var trial = jsPsych.getCurrentTrial();
-
-        // Disable the continue button initially
-        document.getElementById('continue-btn').disabled = true;
-        document.getElementById('continue-btn').style.opacity = '0.5';
-
-        var input = document.getElementById('number-input');
-        var errorDiv = document.getElementById('error-message');
-        var continueBtn = document.getElementById('continue-btn');
-
-        // Validation function
-        function validateInput() {
-            var value = parseInt(input.value);
-
-            if (input.value === '') {
-                errorDiv.textContent = '';
-                continueBtn.disabled = true;
-                continueBtn.style.opacity = '0.5';
-                trial.data.user_number = null;
-                return false;
-            } else if (isNaN(value)) {
-                errorDiv.textContent = 'Please enter a valid number.';
-                continueBtn.disabled = true;
-                continueBtn.style.opacity = '0.5';
-                trial.data.user_number = null;
-                return false;
-            } else if (value < 1 || value > 49) {
-                errorDiv.textContent = 'Please enter a number between 1 and 49.';
-                continueBtn.disabled = true;
-                continueBtn.style.opacity = '0.5';
-                trial.data.user_number = null;
-                return false;
-            } else {
-                errorDiv.textContent = '';
-                continueBtn.disabled = false;
-                continueBtn.style.opacity = '1';
-                // Store the valid number in trial data
-                trial.data.user_number = value;
-                return true;
-            }
-        }
-
-        // Add event listeners
-        input.addEventListener('input', validateInput);
-        input.addEventListener('keyup', function(e) {
-            if (e.key === 'Enter' && validateInput()) {
-                continueBtn.click();
-            }
-        });
-
-        // Focus on input
-        input.focus();
-        },
-    on_finish: function(data) {
-        // The user_number is already stored in data from the validation function
-        // No need to access DOM elements here
-        }
-    };
-
-
-    var rule_det_flex = {
-        timeline: [rule_detection_appearance, rule_appearance],
-        repetitions: 1,
-        randomize_order: false,
-        conditional_function: function () {
-            // execute timeline if condition_assignment = 'cons', skip if condition_assignment = 'flex'
-            if (condition_assignment == 'cons') {
-                return false;
-            } else if (condition_assignment == 'flex') {
-                return true;
-            }
         }
     };
 
@@ -1289,11 +1101,12 @@ var stop_recording = {
         createStartRecordingPoint("instructions"), instructions, stop_recording,
         createStartRecordingPoint("practice"), practice, stop_recording,
         start_exp,
-        choice_task,
-        transfer,
+        random1, // rounds 1-12
+        rule1, // 13-24
+        random2, // rounds 25-36
+        rule2, // 37-48
         expect_check,
         seq_gen,
-        createStartRecordingPoint("ruledetection"), rule_det_flex, stop_recording,
         { type: jsPsychCallFunction, func: function () { sendData(jsPsych.data.get().csv()); } }
     ]
 

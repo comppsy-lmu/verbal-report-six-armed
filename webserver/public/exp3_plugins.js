@@ -174,7 +174,7 @@ var jsPsychSixArmedBandit = (function (jspsych) {
         trial_info = "Trial " + counter.trial + " of " + trial.n_trials;
       
       } else if (isPracticePhase == false && isSeqGen == false && isFinalRound == true && trial.choice_type == "round") {
-        info_text = "Round " + counter.n_rounds + " of " + counter.n_rounds;
+        info_text = "Round 49 of " + counter.n_rounds;
         trial_info = "You've got " + (trial.n_trials-counter.trial) + " of " + trial.n_trials + " trials left";
       }
 
@@ -301,9 +301,9 @@ var jsPsychSixArmedBandit = (function (jspsych) {
 
 
       // check recorded choice
-      // flexible condition
-      // acquisition (phase 1)
-      if (condition_assignment == 'flex' && isPracticePhase == false && isAcquisition == true && isFinalRound == false && isSeqGen == false) { 
+      // practice and random phases identical for both conditions (simple-first and complex-first)
+      // random 1 - rounds 1-12
+      if (isPracticePhase == false && isRandom1 == true && isRandom2 == false && isFinalRound == false && isSeqGen == false) { 
       
       if (counter.round == 1 && response.choice == "Section 1-C" || counter.round == 2 && response.choice == "Section 2-A"
         || counter.round == 3 && response.choice == "Section 3-E" || counter.round == 4 && response.choice == "Section 4-E"
@@ -312,12 +312,6 @@ var jsPsychSixArmedBandit = (function (jspsych) {
         || counter.round == 9 && response.choice == "Section 3-D" || counter.round == 10 && response.choice == "Section 4-B"
         || counter.round == 11 && response.choice == "Section 5-A" || counter.round == 12 && response.choice == "Section 6-E"
 
-        || counter.round == 13 && response.choice == "Section 1-D" || counter.round == 14 && response.choice == "Section 2-F"
-        || counter.round == 15 && response.choice == "Section 3-F" || counter.round == 16 && response.choice == "Section 4-C"
-        || counter.round == 17 && response.choice == "Section 5-A" || counter.round == 18 && response.choice == "Section 6-C"
-        || counter.round == 19 && response.choice == "Section 1-D" || counter.round == 20 && response.choice == "Section 2-B"
-        || counter.round == 21 && response.choice == "Section 3-A" || counter.round == 22 && response.choice == "Section 4-C"
-        || counter.round == 23 && response.choice == "Section 5-D" || counter.round == 24 && response.choice == "Section 6-D"
       ){
 
         response.feedback = 'CORRECT'
@@ -328,7 +322,7 @@ var jsPsychSixArmedBandit = (function (jspsych) {
 
       } 
 
-    } else if (condition_assignment == 'flex' && isPracticePhase == true){
+    } else if (isPracticePhase == true){
       if (response.choice == "Section 1-C"){
 
         response.feedback = 'CORRECT'
@@ -338,68 +332,145 @@ var jsPsychSixArmedBandit = (function (jspsych) {
         response.feedback = 'INCORRECT'
 
       }
-    }
+    } else if (isRandom2 == true && isRandom1 == false) {
 
-    // transfer (phase 2)
-    if(condition_assignment == 'flex' && isPracticePhase == false && isAcquisition == false && isFinalRound == false && isSeqGen == false) {
+      // random 2 - rounds 25-36
+    if (counter.round == 25 && response.choice == "Section 1-D" || counter.round == 26 && response.choice == "Section 2-F"
+    || counter.round == 27 && response.choice == "Section 3-F" || counter.round == 28 && response.choice == "Section 4-C"
+    || counter.round == 29 && response.choice == "Section 5-A" || counter.round == 30 && response.choice == "Section 6-C"
+    || counter.round == 31 && response.choice == "Section 1-D" || counter.round == 32 && response.choice == "Section 2-B"
+    || counter.round == 33 && response.choice == "Section 3-A" || counter.round == 34 && response.choice == "Section 4-C"
+    || counter.round == 35 && response.choice == "Section 5-D" || counter.round == 36 && response.choice == "Section 6-D"
 
-      if ((counter.round == 25 || counter.round == 31 || counter.round == 37 || counter.round == 43) && response.choice == "Section 1-A"){ 
+  ){
+    response.feedback = 'CORRECT'
+  } else {
+    response.feedback = 'INCORRECT'
+  }
+}
+
+    // simple-first condition
+    // simple rule (simple-first condition: rounds 13-24; complex-first condition: rounds 37-48)
+    if(condition_assignment == 'simple-first' && isPracticePhase == false && isRandom1 == false && isRandom2 == false && isFinalRound == false && isSeqGen == false) {
+
+      if ((counter.round == 13 || counter.round == 19) && response.choice == "Section 1-A"){ 
 
         response.feedback = 'CORRECT'
 
 
-      } else if ((counter.round == 25 || counter.round == 31 || counter.round == 37 || counter.round == 43) && response.choice != "Section 1-A"){
+      } else if ((counter.round == 13 || counter.round == 19) && response.choice != "Section 1-A"){
 
         response.feedback = 'INCORRECT'
         console.log(response.feedback)
 
 
-      } else if ((counter.round == 26 || counter.round == 32 || counter.round == 38 || counter.round == 44) && response.choice == "Section 2-B"){
+      } else if ((counter.round == 14 || counter.round == 20) && response.choice == "Section 2-B"){
 
         response.feedback = 'CORRECT'
       
 
-      } else if ((counter.round == 26 || counter.round == 32 || counter.round == 38 || counter.round == 44) && response.choice != "Section 2-B"){
+      } else if ((counter.round == 14 || counter.round == 20) && response.choice != "Section 2-B"){
 
         response.feedback = 'INCORRECT'
       
       }
       
-      else if ((counter.round == 27 || counter.round == 33 || counter.round == 39 || counter.round == 45) && response.choice == "Section 3-C"){
+      else if ((counter.round == 15 || counter.round == 21) && response.choice == "Section 3-C"){
 
         response.feedback = 'CORRECT'
 
-      } else if ((counter.round == 27 || counter.round == 33 || counter.round == 39 || counter.round == 45) && response.choice != "Section 3-C"){
+      } else if ((counter.round == 15 || counter.round == 21) && response.choice != "Section 3-C"){
 
         response.feedback = 'INCORRECT' 
 
       } 
       
-      else if ((counter.round == 28 || counter.round == 34 || counter.round == 40 || counter.round == 46) && response.choice == "Section 4-D"){
+      else if ((counter.round == 16 || counter.round == 22) && response.choice == "Section 4-D"){
 
         response.feedback = 'CORRECT'
 
-      } else if ((counter.round == 28 || counter.round == 34 || counter.round == 40 || counter.round == 46) && response.choice != "Section 4-D"){
+      } else if ((counter.round == 16 || counter.round == 22) && response.choice != "Section 4-D"){
 
         response.feedback = 'INCORRECT'
 
       }
 
-      else if ((counter.round == 29 || counter.round == 35 || counter.round == 41 || counter.round == 47) && response.choice == "Section 5-E"){
+      else if ((counter.round == 17 || counter.round == 23) && response.choice == "Section 5-E"){
 
         response.feedback = 'CORRECT'
         
-      } else if ((counter.round == 29 || counter.round == 35 || counter.round == 41 || counter.round == 47) && response.choice != "Section 5-E"){
+      } else if ((counter.round == 17 || counter.round == 23) && response.choice != "Section 5-E"){
 
         response.feedback = 'INCORRECT'
         
       } 
       
-      else if ((counter.round == 30 || counter.round == 36 || counter.round == 42 || counter.round == 48) && response.choice == "Section 6-F"){
+      else if ((counter.round == 18 || counter.round == 24) && response.choice == "Section 6-F"){
 
         response.feedback = 'CORRECT'
 
-      } else if ((counter.round == 30 || counter.round == 36 || counter.round == 42 || counter.round == 48) && response.choice != "Section 6-F"){
+      } else if ((counter.round == 18 || counter.round == 24) && response.choice != "Section 6-F"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      // complex rule (rounds 37-48)
+      else if ((counter.round == 37 || counter.round == 43) && response.choice == "Section 1-F"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 37 || counter.round == 43) && response.choice != "Section 1-F"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 38 || counter.round == 44) && response.choice == "Section 2-E"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 38 || counter.round == 44) && response.choice != "Section 2-E"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 39 || counter.round == 45) && response.choice == "Section 3-D"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 39 || counter.round == 45) && response.choice != "Section 3-D"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 40 || counter.round == 46) && response.choice == "Section 4-C"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 40 || counter.round == 46) && response.choice != "Section 4-C"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 41 || counter.round == 47) && response.choice == "Section 5-B"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 41 || counter.round == 47) && response.choice != "Section 5-B"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 42 || counter.round == 48) && response.choice == "Section 6-A"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 42 || counter.round == 48) && response.choice != "Section 6-A"){
 
         response.feedback = 'INCORRECT'
 
@@ -408,114 +479,132 @@ var jsPsychSixArmedBandit = (function (jspsych) {
     }
 
 
-    // constrained condition
-    // acquisition (phase 1)
-    
-    if (condition_assignment == 'cons' && isPracticePhase == false && isAcquisition == true && isFinalRound == false && isSeqGen == false) {  
+    // complex-first condition
+    // complex rule
+    if(condition_assignment == 'complex-first' && isPracticePhase == false && isRandom1 == false && isRandom2 == false && isFinalRound == false && isSeqGen == false) {
 
-      console.log('Choice:', response.choice)
-      console.log(response.choice == "Section 1-A")
-      console.log(counter.round)
-
-      if ((counter.round == 1 || counter.round == 7 || counter.round == 13 || counter.round == 19) && response.choice == "Section 1-A"){ 
+      if ((counter.round == 13 || counter.round == 19) && response.choice == "Section 1-F"){ 
 
         response.feedback = 'CORRECT'
 
 
-      } else if ((counter.round == 1 || counter.round == 7 || counter.round == 13 || counter.round == 19) && response.choice != "Section 1-A"){
+      } else if ((counter.round == 13 || counter.round == 19) && response.choice != "Section 1-F"){
 
         response.feedback = 'INCORRECT'
         console.log(response.feedback)
 
 
-      } else if ((counter.round == 2 || counter.round == 8 || counter.round == 14 || counter.round == 20) && response.choice == "Section 2-B"){
+      } else if ((counter.round == 14 || counter.round == 20) && response.choice == "Section 2-E"){
 
         response.feedback = 'CORRECT'
       
 
-      } else if ((counter.round == 2 || counter.round == 8 || counter.round == 14 || counter.round == 20) && response.choice != "Section 2-B"){
+      } else if ((counter.round == 14 || counter.round == 20) && response.choice != "Section 2-E"){
 
         response.feedback = 'INCORRECT'
       
       }
       
-      else if ((counter.round == 3 || counter.round == 9 || counter.round == 15 || counter.round == 21) && response.choice == "Section 3-C"){
+      else if ((counter.round == 15 || counter.round == 21) && response.choice == "Section 3-D"){
 
         response.feedback = 'CORRECT'
 
-      } else if ((counter.round == 3 || counter.round == 9 || counter.round == 15 || counter.round == 21) && response.choice != "Section 3-C"){
+      } else if ((counter.round == 15 || counter.round == 21) && response.choice != "Section 3-D"){
 
         response.feedback = 'INCORRECT' 
 
       } 
       
-      else if ((counter.round == 4 || counter.round == 10 || counter.round == 16 || counter.round == 22) && response.choice == "Section 4-D"){
+      else if ((counter.round == 16 || counter.round == 22) && response.choice == "Section 4-C"){
 
         response.feedback = 'CORRECT'
 
-      } else if ((counter.round == 4 || counter.round == 10 || counter.round == 16 || counter.round == 22) && response.choice != "Section 4-D"){
+      } else if ((counter.round == 16 || counter.round == 22) && response.choice != "Section 4-C"){
 
         response.feedback = 'INCORRECT'
 
       }
 
-      else if ((counter.round == 5 || counter.round == 11 || counter.round == 17 || counter.round == 23) && response.choice == "Section 5-E"){
+      else if ((counter.round == 17 || counter.round == 23) && response.choice == "Section 5-B"){
 
         response.feedback = 'CORRECT'
         
-      } else if ((counter.round == 5 || counter.round == 11 || counter.round == 17 || counter.round == 23) && response.choice != "Section 5-E"){
+      } else if ((counter.round == 17 || counter.round == 23) && response.choice != "Section 5-B"){
 
         response.feedback = 'INCORRECT'
         
-      } else if ((counter.round == 6 || counter.round == 12 || counter.round == 18 || counter.round == 24) && response.choice == "Section 6-F"){
-
-        response.feedback = 'CORRECT'
-
-      } else if ((counter.round == 6 || counter.round == 12 || counter.round == 18 || counter.round == 24) && response.choice != "Section 6-F"){
-
-        response.feedback = 'INCORRECT'
-
-      }
-    
-
-
-    } else if (condition_assignment == 'cons' && isPracticePhase == true){
-      if (response.choice == "Section 1-C"){
-
-        response.feedback = 'CORRECT'
-
-      } else if (response.choice != "Section 1-C"){
-
-        response.feedback = 'INCORRECT'
-
-      }
-    }
-
-    // transfer (phase 2)
-    if (condition_assignment == 'cons' && isPracticePhase == false && isAcquisition == false && isFinalRound == false && isSeqGen == false) {
-
-      if (counter.round == 25 && response.choice == "Section 1-C" || counter.round == 26 && response.choice == "Section 2-A"
-        || counter.round == 27 && response.choice == "Section 3-E" || counter.round == 28 && response.choice == "Section 4-E"
-        || counter.round == 29 && response.choice == "Section 5-E" || counter.round == 30 && response.choice == "Section 6-B"
-        || counter.round == 31 && response.choice == "Section 1-F" || counter.round == 32 && response.choice == "Section 2-B"
-        || counter.round == 33 && response.choice == "Section 3-D" || counter.round == 34 && response.choice == "Section 4-B"
-        || counter.round == 35 && response.choice == "Section 5-A" || counter.round == 36 && response.choice == "Section 6-E"
-
-        || counter.round == 37 && response.choice == "Section 1-D" || counter.round == 38 && response.choice == "Section 2-F"
-        || counter.round == 39 && response.choice == "Section 3-F" || counter.round == 40 && response.choice == "Section 4-C"
-        || counter.round == 41 && response.choice == "Section 5-A" || counter.round == 42 && response.choice == "Section 6-C"
-        || counter.round == 43 && response.choice == "Section 1-D" || counter.round == 44 && response.choice == "Section 2-B"
-        || counter.round == 45 && response.choice == "Section 3-A" || counter.round == 46 && response.choice == "Section 4-C"
-        || counter.round == 47 && response.choice == "Section 5-D" || counter.round == 48 && response.choice == "Section 6-D"
-      ){
-
-        response.feedback = 'CORRECT'
-
-      } else {
-
-        response.feedback = 'INCORRECT'
-
       } 
+      
+      else if ((counter.round == 18 || counter.round == 24) && response.choice == "Section 6-A"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 18 || counter.round == 24) && response.choice != "Section 6-A"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      // simple rule (rounds 37-48)
+      else if ((counter.round == 37 || counter.round == 43) && response.choice == "Section 1-A"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 37 || counter.round == 43) && response.choice != "Section 1-A"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 38 || counter.round == 44) && response.choice == "Section 2-B"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 38 || counter.round == 44) && response.choice != "Section 2-B"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 39 || counter.round == 45) && response.choice == "Section 3-C"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 39 || counter.round == 45) && response.choice != "Section 3-C"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 40 || counter.round == 46) && response.choice == "Section 4-D"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 40 || counter.round == 46) && response.choice != "Section 4-D"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 41 || counter.round == 47) && response.choice == "Section 5-E"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 41 || counter.round == 47) && response.choice != "Section 5-E"){
+
+        response.feedback = 'INCORRECT'
+
+      }
+
+      else if ((counter.round == 42 || counter.round == 48) && response.choice == "Section 6-F"){
+
+        response.feedback = 'CORRECT'
+
+      } else if ((counter.round == 42 || counter.round == 48) && response.choice != "Section 6-F"){
+
+        response.feedback = 'INCORRECT'
+
+      }
 
     }
 
@@ -524,7 +613,7 @@ var jsPsychSixArmedBandit = (function (jspsych) {
 
 
 
-    if (isFinalRound == true && isAcquisition == false && isPracticePhase == false && isSeqGen == false && trial.choice_type == "round") {
+    if (isFinalRound == true && isPracticePhase == false && isSeqGen == false && trial.choice_type == "round") {
       // final round winner: Section 1-C
       if (response.choice == "Section 1-C"){
 
@@ -599,135 +688,26 @@ var jsPsychSixArmedBandit = (function (jspsych) {
 
 
   // define correct_option globally
-  if (condition_assignment == "flex" && isFinalRound == false) {
-    if (counter.round == 26 || counter.round == 32 || counter.round == 38 || counter.round == 44) {
-      correct_option = "Section 2-B"
-    } else if ([25, 31, 37, 43].includes(counter.round)) {
-      correct_option = "Section 1-A"
-    } else if ([30, 36, 42, 48].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    } else if ([29, 35, 41, 47].includes(counter.round)) {
-      correct_option = "Section 5-E"
-    } else if ([27, 33, 39, 45].includes(counter.round)) {
-      correct_option = "Section 3-C"
-    } else if ([28, 34, 40, 46].includes(counter.round)) {
-      correct_option = "Section 4-D"
-    } else if ([1].includes(counter.round)) {
-      correct_option = "Section 1-C"
-    } else if ([2].includes(counter.round)) {
-      correct_option = "Section 2-A"
-    } else if ([3].includes(counter.round)) {
-      correct_option = "Section 3-E"
-    } else if ([4].includes(counter.round)) {
-      correct_option = "Section 4-E"
-    } else if ([5].includes(counter.round)) {
-      correct_option = "Section 5-E"
-    } else if ([6].includes(counter.round)) {
-      correct_option = "Section 6-B"
-    } else if ([7].includes(counter.round)) {
-      correct_option = "Section 1-F"
-    } else if ([8, 20].includes(counter.round)) {
-      correct_option = "Section 2-B"
-    } else if ([9].includes(counter.round)) {
-      correct_option = "Section 3-D"
-    } else if ([10].includes(counter.round)) {
-      correct_option = "Section 4-B"
-    } else if ([11, 17].includes(counter.round)) {
-      correct_option = "Section 5-A"
-    } else if ([12].includes(counter.round)) {
-      correct_option = "Section 6-E"
-    } else if ([13, 19].includes(counter.round)) {
-      correct_option = "Section 1-D"
-    } else if ([14].includes(counter.round)) {
-      correct_option = "Section 2-F"
-    } else if ([15].includes(counter.round)) {
-      correct_option = "Section 3-F"
-    } else if ([16, 22].includes(counter.round)) {
-      correct_option = "Section 4-C"
-    } else if ([18].includes(counter.round)) {
-      correct_option = "Section 6-C"
-    } else if ([21].includes(counter.round)) {
-      correct_option = "Section 3-A"
-    } else if ([23].includes(counter.round)) {
-      correct_option = "Section 5-D"
-    } else if ([24].includes(counter.round)) {
-      correct_option = "Section 6-D"
-    }
-    
-  } else if (condition_assignment == "cons" && isFinalRound == false) { 
-    if (counter.round == 1 || counter.round == 7 || counter.round == 13 || counter.round == 19) {
-      correct_option = "Section 1-A"
-    } else if ([4, 10, 16, 22].includes(counter.round)) {
-      correct_option = "Section 4-D"
-    } else if ([2, 8, 14, 20].includes(counter.round)) {
-      correct_option = "Section 2-B"
-    } else if ([5, 11, 17, 23].includes(counter.round)) {
-      correct_option = "Section 5-E"
-    } else if ([3, 9, 15, 21].includes(counter.round)) {
-      correct_option = "Section 3-C"
-    } 
-    else if ([6].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    }
-    else if ([12].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    }
-    else if ([18].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    }
-    else if ([24].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    }
-    
-    /*else if ([6, 12, 18, 24].includes(counter.round)) {
-      correct_option = "Section 6-F"
-    } */
-   
-      else if ([25].includes(counter.round)) {
-      correct_option = "Section 1-C"
-    } else if ([26].includes(counter.round)) {
-      correct_option = "Section 2-A"
-    } else if ([27].includes(counter.round)) {
-      correct_option = "Section 3-E"
-    } else if ([28].includes(counter.round)) {
-      correct_option = "Section 4-E"
-    } else if ([29].includes(counter.round)) {
-      correct_option = "Section 5-E"
-    } else if ([30].includes(counter.round)) {
-      correct_option = "Section 6-B"
-    } else if ([31].includes(counter.round)) {
-      correct_option = "Section 1-F"
-    } else if ([32, 44].includes(counter.round)) {
-      correct_option = "Section 2-B"
-    } else if ([33].includes(counter.round)) {
-      correct_option = "Section 3-D"
-    } else if ([34].includes(counter.round)) {
-      correct_option = "Section 4-B"
-    } else if ([35, 41].includes(counter.round)) {
-      correct_option = "Section 5-A"
-    } else if ([36].includes(counter.round)) {
-      correct_option = "Section 6-E"
-    } else if ([37, 43].includes(counter.round)) {
-      correct_option = "Section 1-D"
-    } else if ([38].includes(counter.round)) {
-      correct_option = "Section 2-F"
-    } else if ([39].includes(counter.round)) {
-      correct_option = "Section 3-F"
-    } else if ([40, 46].includes(counter.round)) {
-      correct_option = "Section 4-C"
-    } else if ([42].includes(counter.round)) {
-      correct_option = "Section 6-C"
-    } else if ([45].includes(counter.round)) {
-      correct_option = "Section 3-A"
-    } else if ([47].includes(counter.round)) {
-      correct_option = "Section 5-D"
-    } else if ([48].includes(counter.round)) {
-      correct_option = "Section 6-D"
-    }
+  // winners per round; random phases identical for both conditions, rule phases swap order
+  const random1_winners = ["Section 1-C", "Section 2-A", "Section 3-E", "Section 4-E", "Section 5-E", "Section 6-B",
+                           "Section 1-F", "Section 2-B", "Section 3-D", "Section 4-B", "Section 5-A", "Section 6-E"]; // rounds 1-12
+  const random2_winners = ["Section 1-D", "Section 2-F", "Section 3-F", "Section 4-C", "Section 5-A", "Section 6-C",
+                           "Section 1-D", "Section 2-B", "Section 3-A", "Section 4-C", "Section 5-D", "Section 6-D"]; // rounds 25-36
+  const simple_winners  = ["Section 1-A", "Section 2-B", "Section 3-C", "Section 4-D", "Section 5-E", "Section 6-F"];
+  const complex_winners = ["Section 1-F", "Section 2-E", "Section 3-D", "Section 4-C", "Section 5-B", "Section 6-A"];
 
-  } else if (isFinalRound == true) {
+  if (isPracticePhase == true || isFinalRound == true) {
     correct_option = "Section 1-C"
+  } else if (counter.round >= 1 && counter.round <= 12) {
+    correct_option = random1_winners[counter.round - 1]
+  } else if (counter.round >= 25 && counter.round <= 36) {
+    correct_option = random2_winners[counter.round - 25]
+  } else if (counter.round >= 13 && counter.round <= 24) { // rule phase 1
+    correct_option = (condition_assignment == "simple-first" ? simple_winners : complex_winners)[(counter.round - 13) % 6]
+  } else if (counter.round >= 37 && counter.round <= 48) { // rule phase 2
+    correct_option = (condition_assignment == "simple-first" ? complex_winners : simple_winners)[(counter.round - 37) % 6]
   }
+  section_only = correct_option.match(/Section \d+/)[0];
   
 
   
