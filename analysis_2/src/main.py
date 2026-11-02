@@ -11,6 +11,8 @@ pipeline.PROGRESS = True
 MODEL = "qwen3.8:27b"
 base.WORKERS = 1
 EXPORT_CALLS = True
+# Enough to resolve a p-value below the Bonferroni threshold for the sweep.
+PERMUTATIONS = 5000
 
 CLASSIFIERS = [
     # DummyClassifier(strategy="uniform"),
@@ -36,7 +38,6 @@ from extractors.taxonomy.extractor import TaxonomyExtractor
 from extractors.taxonomy.levels import Categories, Clusters
 from extractors.taxonomy.scopes import Acquisition
 from extractors.taxonomy.segments import Groups
-from classifiers import GroupForward, MeanForward, by_category, by_half
 from pipeline import (
     calls_config,
     scores_config,
@@ -65,39 +66,26 @@ SWEEP = [
     for level in [Categories(), Clusters(across="max"), Clusters(across="mean")]
 ]
 
-
-def forward_models(columns):
-    return [
-        GroupForward(by_category(columns), name="by-category", criterion="bic"),
-        GroupForward(by_half(columns), name="by-half", criterion="bic"),
-        MeanForward(by_half(columns), name="by-half-mean", criterion="bic"),
-    ]
-
-
 # The two exports are named by what they hold, not by the whole config, so most
 # of the sweep would just rewrite the same file. Write each one once.
 exported_scores: set[str] = set()
 exported_calls: set[str] = set()
 
-for extractor in SWEEP:
-    frame = features(extractor)
-    if (key := scores_config(extractor)) not in exported_scores:
-        exported_scores.add(key)
-        unit_features(extractor)
-    if EXPORT_CALLS and (key := calls_config(extractor)) not in exported_calls:
-        exported_calls.add(key)
-        export_calls(extractor)
-    for classifier in CLASSIFIERS:
-        evaluate(make_pipeline(extractor, classifier), n_permutations=500)
-    # blocks are groups of passages, so there have to be passages left to group.
-    # only Groups has a pooling mode at all, and it is the only segmenter whose
-    # unit count is the same for every participant, which unpooled features need
-    segments = extractor.segments
-    if isinstance(segments, Groups) and segments.pooling == "none":
-        for selector in forward_models(frame.columns.drop("aware")):
+# The whole cohort, then the second batch alone: whether the pattern holds
+# without the participants the analysis was built on.
+for batch in [None, 2]:
+    pipeline.BATCH = batch
+    for extractor in SWEEP:
+        features(extractor)
+        if (key := scores_config(extractor)) not in exported_scores:
+            exported_scores.add(key)
+            unit_features(extractor)
+        if EXPORT_CALLS and (key := calls_config(extractor)) not in exported_calls:
+            exported_calls.add(key)
+            export_calls(extractor)
+        for classifier in CLASSIFIERS:
             evaluate(
-                make_pipeline(extractor, StandardScaler(), selector),
-                n_permutations=500,
+                make_pipeline(extractor, classifier), n_permutations=PERMUTATIONS
             )
 
 results_table()

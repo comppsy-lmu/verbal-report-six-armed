@@ -13,14 +13,18 @@ from utils import data, llm
 from utils.paths import OUTPUT
 
 PROGRESS = False  # main.py turns this on
+BATCH: int | None = None  # None analyses every batch together
 
 
 def cohort(limit: int | None = None) -> tuple[list[str], pd.Series]:
     """Analyzable participants that also carry a behavioral label."""
     labels = data.vr()["aware"].dropna().astype(int)
-    return [p for p in data.analyzable_participants() if p in labels.index][
-        :limit
-    ], labels
+    batches = data.vr()["batch"]
+    return [
+        p
+        for p in data.analyzable_participants()
+        if p in labels.index and BATCH in (None, batches[p])
+    ][:limit], labels
 
 
 def slug(config: str) -> str:
@@ -47,7 +51,10 @@ def calls_config(extractor) -> str:
 
 
 def _filename(config: str) -> str:
-    return f"{slug(config)}-{hashlib.sha256(config.encode()).hexdigest()[:8]}.csv"
+    """One file per config, kept apart per batch so a narrower cohort does not
+    overwrite the results of the whole one."""
+    prefix = f"batch{BATCH}-" if BATCH else ""
+    return f"{prefix}{slug(config)}-{hashlib.sha256(config.encode()).hexdigest()[:8]}.csv"
 
 
 def features(extractor, limit: int | None = None) -> pd.DataFrame:
@@ -272,6 +279,7 @@ def evaluate(model, limit: int | None = None, n_permutations: int = 0, seed: int
     observed = _metrics(model, X, y)
     result = {
         "model": _name(model),
+        "batch": BATCH,
         "n": len(y),
         "pos_rate": float(y.mean()),
         **observed,

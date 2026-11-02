@@ -1,6 +1,12 @@
 FROM python:3.11-slim
 
-RUN pip install --no-cache-dir faster-whisper tqdm
+# Transcripts are the measurement, not a build artefact: a version bump moves
+# the text and silently invalidates every label derived from it.
+RUN pip install --no-cache-dir \
+    faster-whisper==1.2.1 \
+    ctranslate2==4.7.2 \
+    av==17.0.1 \
+    tqdm
 
 WORKDIR /app
 COPY transcribe.py .
